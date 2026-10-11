@@ -1,0 +1,10 @@
+{
+  "name": "weekly-cleanup",
+  "description": "Use when asked to clean up old drafts: archive, never delete.",
+  "purpose": "archive drafts untouched for 30 days",
+  "input": ["drafts folder"],
+  "steps": ["list drafts older than 30 days", "archive each", "report count"],
+  "decide": ["none found: say nothing", "archive fails: stop, report error"],
+  "run": ["mailtool archive --older-than 30d --folder drafts"],
+  "never": ["delete a draft"]
+}

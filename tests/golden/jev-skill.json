@@ -1,0 +1,13 @@
+{
+  "name": "mention-scout",
+  "description": "Use when scanning new mentions for ones worth a reply.",
+  "purpose": "pick mentions worth a reply",
+  "input": ["mentions since last run", "state file of seen ids"],
+  "questions": ["needs_reply (yes/no): a reply would help the asker", "tone (pick-one: friendly/neutral/hostile): tone of the mention"],
+  "steps": ["drop ids already in state file", "ask Jev questions per mention", "list picks, one line each"],
+  "decide": ["id in state file: skip, no Jev call"],
+  "thresholds": ["needs_reply >= 0.8: list it", "needs_reply 0.5-0.8: list under maybe", "tone hostile: never list"],
+  "jev_down": "list nothing; report Jev down once",
+  "run": ["jev ask --questions mention-scout.questions --input {mention}"],
+  "never": ["reply or post"]
+}
