@@ -17,6 +17,7 @@ PATTERNS = [
     ("email", r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"),
     ("phone", r"(?<![\w.])\+\d[\d ().-]{8,}\d(?![\w.])"),
     ("phone", r"(?<![\w.])\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4}(?![\w.])"),
+    ("phone", r"(?<![\w.+/-])1?[2-9]\d{2}[2-9]\d{6}(?![\w./-])"),
     ("ipv4", r"(?<![\w.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\w.])"),
     ("ipv6", r"(?<![\w:])(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}(?![\w:])"),
     ("ipv6", r"(?<![\w:])(?:[0-9A-Fa-f]{1,4}:){1,6}:[0-9A-Fa-f]{1,4}(?![\w:])"),
@@ -33,6 +34,11 @@ PATTERNS = [
     ("jwt", r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
     ("secret assignment",
      r"(?i)\b(?:api[_-]?key|secret|token|passwd|password|auth)\b[\"']?\s*[:=]\s*[\"'][^\"'\s{}<>]{12,}[\"']"),
+    ("bearer token", r"(?i)\bauthorization\s*[:=]\s*[\"']?bearer\s+[A-Za-z0-9._~+/-]{8,}=*"),
+    ("bearer token", r"(?i)\bbearer\s+[A-Za-z0-9._~+/-]{20,}=*"),
+    ("secret assignment",
+     r"\b[A-Za-z_][A-Za-z0-9_]*\s*=\s*(?:[0-9a-fA-F]{24,}"
+     r"|(?=[A-Za-z0-9+/_-]*\d)(?=[A-Za-z0-9+/_-]*[A-Za-z])[A-Za-z0-9+/_-]{24,}={0,2})(?![\w+/=-])"),
     ("url credentials", r"[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@"),
 ]
 COMPILED = [(name, re.compile(rx)) for name, rx in PATTERNS]

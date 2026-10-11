@@ -22,6 +22,23 @@ SAMPLES = {
     "api key": "sk" + "-" + "abcdEFGH1234" * 2,
     "secret assignment": "api_key" + " = " + '"' + "zz9Yq2Lm8Kp3Xw" + '"',
 }
+EXTRA_SAMPLES = [
+    ("phone", "text me at " + "415" + "555" + "0123"),
+    ("phone", "call " + "1" + "212" + "555" + "0199" + " today"),
+    ("bearer token", "Authorization" + ": Bearer " + "abc123DEF456ghi789"),
+    ("bearer token", "curl -H 'authorization: bearer " + "x9" * 12 + "'"),
+    ("secret assignment", "TOKEN" + "=" + "deadbeef" * 4),
+    ("secret assignment", "export API_SECRET" + "=" + "U2VjcmV0" * 4 + "=="),
+    ("secret assignment", "db_pass" + " = " + "a1b2c3d4e5f6a7b8c9d0e1f2"),
+]
+EXTRA_CLEAN = [
+    "id 1234567890123",
+    "run 38145337037",
+    "sha e3b5c0e48a5318a6efeeec7c105ec150610711b9",
+    "MODE=production_deployment_settings",
+    "the bearer of bad news",
+    "python -m unittest discover -s tests -v",
+]
 CLEAN = [
     "uses: actions/checkout" + AT + "v4",
     "python-version: ['3.10', '3.11', '3.12', '3.13']",
@@ -38,8 +55,13 @@ class ScanTest(unittest.TestCase):
                 kinds = [k for _, k, _ in scan.scan_text(text)]
                 self.assertIn(kind, kinds)
 
+    def test_detects_extra_samples(self):
+        for kind, text in EXTRA_SAMPLES:
+            with self.subTest(text):
+                self.assertIn(kind, [k for _, k, _ in scan.scan_text(text)])
+
     def test_ignores_clean_lines(self):
-        for text in CLEAN:
+        for text in CLEAN + EXTRA_CLEAN:
             with self.subTest(text):
                 self.assertEqual(scan.scan_text(text), [])
 
