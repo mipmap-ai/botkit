@@ -11,12 +11,10 @@ Report findings and fixes; change nothing until the owner picks.
 Cost per check: code is free, Jev costs almost nothing, a model wake is expensive. Use the cheapest tier that can decide correctly.
 
 - Code: exact rules, same input gives same output. e.g. "any new mail since last run?", "is this sender on the allowlist?"
-- Jev: needs judgment but is yes/no or pick-one. e.g. "is this message about billing?", "does this need the owner?"
+- Jev (the shared `jev` command): needs judgment but is yes/no or pick-one. e.g. "is this message about billing?", "does this need the owner?"
 - Model: open-ended reasoning or writing. e.g. writing a daily digest, planning a multi-step task
 
 Stack them: code filters first, Jev judges what's left, the model wakes only for what survives. Flag any check running on a pricier tier than it needs.
-
-Jev is the cheap scoring API (yes/no and pick-one, with a confidence score), called through the shared `jev` command.
 
 ## Routine (review your own, before creating or changing it)
 
