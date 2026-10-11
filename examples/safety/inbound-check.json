@@ -1,0 +1,19 @@
+{
+  "allow": [
+    "owner",
+    "family-chat"
+  ],
+  "block": [
+    "known-spammer"
+  ],
+  "risky_words": [
+    "delete",
+    "password",
+    "pay",
+    "payment",
+    "transfer",
+    "wire",
+    "gift card",
+    "verification code"
+  ]
+}
