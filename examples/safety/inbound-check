@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Example safety check for acting on an inbound message.
+
+Usage: inbound-check --from SENDER --text MESSAGE [--config FILE]
+       inbound-check --help    (prints this text instead of a result)
+
+Prints exactly one of ALLOW, NEEDS_HUMAN, IGNORE to stdout, writes the reason
+to stderr and exits 0. Anything unexpected (bad arguments, missing or invalid
+config, a crash) fails closed to NEEDS_HUMAN.
+
+Rules, in order:
+  sender on the block list          -> IGNORE
+  sender not on the allow list      -> NEEDS_HUMAN
+  text contains a risky word        -> NEEDS_HUMAN
+  otherwise                         -> ALLOW
+
+The config defaults to inbound-check.json next to this program:
+  {"allow": [...], "block": [...], "risky_words": [...]}
+Everything is normalized before comparing: NFKC, casefold, every whitespace
+run collapsed to one space. Text, risky words and the block list are also
+folded: zero-width and other invisible format characters (soft hyphen
+included) are removed and Cyrillic and Greek look-alike letters become Latin.
+The allow list is matched without folding, so a look-alike sender name is not
+allowed. Risky words match whole words; a space inside a phrase may be missing.
+"""
+
+import json
+import os
+import re
+import sys
+import unicodedata
+
+ALLOW, NEEDS_HUMAN, IGNORE = "ALLOW", "NEEDS_HUMAN", "IGNORE"
+
+
+class BadInput(Exception):
+    pass
+
+
+OPTIONS = ("--from", "--text", "--config")
+
+
+def load_config(path):
+    with open(path, encoding="utf-8") as fh:
+        cfg = json.load(fh)
+    if not isinstance(cfg, dict):
+        raise BadInput("config must be a JSON object")
+    out = {}
+    for key in ("allow", "block", "risky_words"):
+        vals = cfg.get(key, [])
+        if not isinstance(vals, list) or not all(isinstance(v, str) and v.strip() for v in vals):
+            raise BadInput(f"config '{key}' must be a list of non-empty strings")
+        out[key] = [(normalize if key == "allow" else fold)(v) for v in vals]
+    return out
+
+
+# Cyrillic and Greek letters that look like Latin ones, keyed by their
+# casefolded form. Several are only look-alikes in upper case (в, н, κ, μ),
+# which casefold maps down; folding them anyway errs toward NEEDS_HUMAN.
+LOOKALIKES = str.maketrans({
+    "а": "a", "в": "b", "е": "e", "ё": "e", "і": "i", "ї": "i",
+    "ј": "j", "к": "k", "м": "m", "н": "h", "о": "o", "р": "p", "с": "c",
+    "т": "t", "у": "y", "х": "x", "ѕ": "s", "ԁ": "d", "ԛ": "q", "ԝ": "w",
+    "һ": "h", "ӏ": "l", "ь": "b",
+    "α": "a", "β": "b", "γ": "y", "ε": "e", "ζ": "z", "η": "n", "ι": "i",
+    "κ": "k", "μ": "m", "ν": "v", "ο": "o", "ρ": "p", "τ": "t", "υ": "u",
+    "χ": "x", "ω": "w",
+})
+INVISIBLE = {"\u034f", "\u115f", "\u1160", "\u3164", "\uffa0"}
+
+
+def normalize(s):
+    """NFKC, casefold, every whitespace run to one space, trimmed."""
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s).casefold()).strip()
+
+
+def fold(s):
+    """normalize, minus zero-width and format characters (soft hyphen
+    included), with Cyrillic and Greek look-alikes mapped to Latin."""
+    s = unicodedata.normalize("NFKC", s)
+    s = "".join(c for c in s if c not in INVISIBLE and unicodedata.category(c) != "Cf")
+    return normalize(s.casefold().translate(LOOKALIKES))
+
+
+def phrase_pattern(phrase):
+    """Whole-word match; a space inside the phrase may also be missing."""
+    return r"(?<!\w)" + " ?".join(map(re.escape, phrase.split(" "))) + r"(?!\w)"
+
+
+def decide(sender, text, cfg):
+    if fold(sender) in cfg["block"]:
+        return IGNORE, f"sender {sender!r} is blocked"
+    if normalize(sender) not in cfg["allow"]:
+        return NEEDS_HUMAN, f"sender {sender!r} is not on the allow list"
+    folded = fold(text)
+    for word in cfg["risky_words"]:
+        if re.search(phrase_pattern(word), folded):
+            return NEEDS_HUMAN, f"text mentions risky word {word!r}"
+    return ALLOW, "known sender, no risky words"
+
+
+def parse_args(argv):
+    """Take each option's value verbatim, so message text may start with '-'."""
+    opts = {}
+    i = 0
+    while i < len(argv):
+        name, eq, value = argv[i].partition("=")
+        if name not in OPTIONS:
+            raise BadInput(f"unexpected argument {argv[i]!r}")
+        if not eq:
+            i += 1
+            if i == len(argv):
+                raise BadInput(f"{name} needs a value")
+            value = argv[i]
+        if name in opts:
+            raise BadInput(f"{name} given twice")
+        opts[name] = value
+        i += 1
+    for name in ("--from", "--text"):
+        if not opts.get(name, "").strip():
+            raise BadInput(f"missing or empty {name}")
+    return opts
+
+
+def run(argv):
+    opts = parse_args(argv)
+    path = opts.get("--config") or os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "inbound-check.json"
+    )
+    return decide(opts["--from"], opts["--text"], load_config(path))
+
+
+def main(argv):
+    if argv in (["-h"], ["--help"]):
+        sys.stdout.write(__doc__)
+        return 0
+    try:
+        result, reason = run(argv)
+    except BadInput as e:
+        result, reason = NEEDS_HUMAN, f"bad input: {e}"
+    except Exception as e:  # fail closed on anything unexpected
+        result, reason = NEEDS_HUMAN, f"error: {type(e).__name__}: {e}"
+    print(reason, file=sys.stderr)
+    print(result)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,19 @@
+{
+  "program": "inbound-check",
+  "cases": [
+    {"args": ["--from", "owner", "--text", "lunch at noon?"], "expect": "ALLOW", "why": "known sender, plain text"},
+    {"args": ["--from", "family-chat", "--text", "- buy milk"], "expect": "ALLOW", "why": "text starting with '-' is still text"},
+    {"args": ["--from", "owner", "--text", "paying attention"], "expect": "ALLOW", "why": "risky words match whole words only"},
+    {"args": ["--from", "known-spammer", "--text", "hi"], "expect": "IGNORE", "why": "block list"},
+    {"args": ["--from", "stranger", "--text", "hi"], "expect": "NEEDS_HUMAN", "why": "unknown sender"},
+    {"args": ["--from", "owner", "--text", "please pay the bill"], "expect": "NEEDS_HUMAN", "why": "risky word"},
+    {"args": ["--from", "owner", "--text", "what's the verification  code"], "expect": "NEEDS_HUMAN", "why": "past mistake: double space hid a phrase"},
+    {"args": ["--from", "owner", "--text", "buy a gift\tcard"], "expect": "NEEDS_HUMAN", "why": "past mistake: tab hid a phrase"},
+    {"args": ["--from", "owner", "--text", "please \uff30\uff21\uff39 now"], "expect": "NEEDS_HUMAN", "why": "past mistake: fullwidth letters"},
+    {"args": ["--from", "owner", "--text", "please pa\u00ady me"], "expect": "NEEDS_HUMAN", "why": "past mistake: soft hyphen inside a word"},
+    {"args": ["--from", "owner", "--text", "please p\u0430y"], "expect": "NEEDS_HUMAN", "why": "past mistake: Cyrillic look-alike letter"},
+    {"args": ["--from", "\u043ewner", "--text", "hi"], "expect": "NEEDS_HUMAN", "why": "look-alike sender is not on the allow list"},
+    {"args": ["--from", "owner"], "expect": "NEEDS_HUMAN", "why": "bad input fails closed"},
+    {"args": ["--from", "owner", "--text", "hi", "--config", "missing-config.json"], "expect": "NEEDS_HUMAN", "why": "missing config fails closed"}
+  ]
+}

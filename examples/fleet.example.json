@@ -1,0 +1,5 @@
+{
+  "feed-bot": "feed-bot: surface feed items worth reading; quiet otherwise",
+  "inbox-bot": "inbox-bot: keep inbox triaged; draft replies, never send",
+  "infra-bot": "infra-bot: keep home servers healthy; report and fix routine breakage"
+}
