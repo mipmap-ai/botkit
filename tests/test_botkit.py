@@ -665,6 +665,26 @@ class DocsTest(unittest.TestCase):
         for needle in ("Randomize", "Centered", "2048 x 2048", "ROOT/avatars/<bot-name>.png",
                        "up to 3 tries", "UpdateAvatar"):
             self.assertIn(needle, avatar)
+        self.assertIn("if the UI differs, use its equivalent controls", avatar)
+        install = re.search(r"(?m)^4\. \*\*Create the bots and avatars folders\.\*\*.*$", read("AGENTS.md")).group(0)
+        self.assertIn("`ROOT/avatars/`", install)
+
+    def test_coding_bot_sizing(self):
+        sizing = re.search(r"(?m)^- Sizing: .*$", section(read("skills/design-a-grok-bot/SKILL.md"),
+                                                          "## Coding bots")).group(0)
+        for needle in ("one cloud agent and no pstack", "full feature uses pstack's Feature playbook",
+                       "several components uses swarm", "multi-day work uses Orchestrate", "verifier on every PR"):
+            self.assertIn(needle, sizing)
+
+    def test_after_create_handover_matches_handover_list(self):
+        agents = section(read("AGENTS.md"), "### Handing skills to other bots")
+        step = re.search(r"(?m)^3\. Skip this step.*$",
+                         section(read("skills/design-a-grok-bot/SKILL.md"), "## After create")).group(0)
+        listed = re.findall(r"(?m)^- ([a-z0-9-]+): every bot", agents)
+        self.assertEqual(sorted(listed), ["bot-references", "bot-safety-check", "cost-review"])
+        for name in listed:
+            self.assertIn(name, step)
+        self.assertIn("routines", step)
 
     def test_cost_review_wired_in(self):
         design = read("skills/design-a-grok-bot/SKILL.md")
