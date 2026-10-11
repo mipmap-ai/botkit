@@ -82,11 +82,11 @@ If there is no delete tool, only create when the job is real.
 
 ## References (only if the bot needs fixed reference material)
 
-Reference docs (specs, lookup tables, research) are files in `ROOT/references/`, never in the profile and never a skill. List only file names on the References field. Add or update the file's one-line entry in `ROOT/references/INDEX.md` (`file: what it is / when to read it`). The shared bot-references skill tells bots how to use them (with per-bot skill stores, hand it over in After create, step 2); don't repeat it in profiles. Several bots can list the same file; its description lives only in the index.
+Reference docs (specs, lookup tables, research) are files in `ROOT/references/`, never in the profile and never a skill. List only file names on the References field. Add or update the file's one-line entry in `ROOT/references/INDEX.md` (`file: what it is / when to read it`). The shared bot-references skill tells bots how to use them (with per-bot skill stores, hand it over in After create, step 3); don't repeat it in profiles. Several bots can list the same file; its description lives only in the index.
 
 ## Safety check (only if the bot has risky actions)
 
-The shared bot-safety-check skill tells a bot to run its Safety program before risky actions and obey the result; with per-bot skill stores, the bot has it only once you hand it over (After create, step 2). Don't repeat that rule in the profile.
+The shared bot-safety-check skill tells a bot to run its Safety program before risky actions and obey the result; with per-bot skill stores, the bot has it only once you hand it over (After create, step 3). Don't repeat that rule in the profile.
 
 Write or pick a check program in `ROOT/safety/` and reference it by bare name plus parameters, with `{placeholders}` for values filled from the action:
 
@@ -142,18 +142,30 @@ Don't ask for tools, plugins or model if a working sibling bot can be copied. Do
 
 ## Coding bots
 
-Hold them to the team's coding playbook: one purpose, plain prose, verified work. Responsibilities and Boundaries say: repo work goes to cloud coding agents; work on files that live on the bot computer stays there; short plain replies. Don't paste the playbook into the profile.
+The bar is pstack. Read pstack's poteto-mode when writing the profile: one purpose, unslopped prose, verified work.
 
-Sizing: a job too big for one agent (parallel work, several components, a full feature) runs as several agents with a verifier on every PR before merge. A small single-file job gets one agent. This rule lives in shared memory and here, not in each profile.
+- Responsibilities and Boundaries say: repo work goes to Cursor cloud agents (pstack's skills launch them); work on files that live on the bot computer stays there; replies short and unslopped; pstack and poteto-mode are situational, not standing.
+- Never paste the pstack playbook into a profile.
+- Sizing: a job too big for one cloud agent (parallel work, several components, a full feature) runs through pstack's swarm or orchestrate playbook: several cloud agents, a verifier on every PR before merge. A small single-file job gets one cloud agent and no pstack.
 
 ## Non-coding bots
 
-Same tightness. Purpose names the only job. Responsibilities give the concrete how (which API, inbox, channel). Boundaries name the adjacent verb it never does. Stay quiet when there is nothing to report.
+- Purpose names the only job; Responsibilities give the concrete how (which API, inbox, channel); Boundaries name the adjacent verb it never does; stay quiet when there's nothing to report.
+
+## Avatar (every new bot)
+
+Right after create, without asking, give the bot a picture from https://botbuilder.mipmap.ai/.
+
+- Use the desktop browser: open the site, press Randomize, open the right panel's Frame tab and set it to Centered (Randomize also randomizes Frame into cropped poses), then click `2x / Download PNG 2048 x 2048`. Save it to `ROOT/avatars/<bot-name>.png`. Look at it.
+- Broken (garbled, blank, cut off): randomize again, up to 3 tries.
+- A bot can only set its own picture: message the new bot with the image attached; tell it to set it as its avatar (Grok Bot: `UpdateAvatar`) and confirm.
+- Show the owner the image in the create message; regenerate if they dislike it.
 
 ## After create
 
 1. Read the live profile back. Tell the owner the name and the Purpose lines.
-2. Skip this step when skills are shared across bots (Grok Bot default): the new bot already has them. Only with per-bot skill stores, hand the new bot its shared skills; only it can save them, and without them it ignores its own Safety and References lines. If its profile has `Safety:`, send bot-safety-check; if it has `References:`, send bot-references. Message the bot with the skill name, the full `ROOT/botkit/skills/<name>/SKILL.md` content, and the instruction to save it through its skill tool under that name (Grok Bot: `UpdateSkill`, action `write`), following "Saving one botkit skill" in botkit's AGENTS.md, then reply with the note. Confirm to the owner what you sent and the replies. If sending fails, say so and give the owner the one-line instruction to paste into that bot.
-3. Write 6-30 scenarios (start near 10) in `ROOT/evals/<name>.json` and run them with the evaluate-a-grok-bot skill before the bot goes live; re-run after every profile or skill change.
-4. Add the bot to the fleet file: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When a bot's purpose changes, update its line too.
-5. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.
+2. Make and hand over its avatar as in "Avatar (every new bot)"; show it in the same message.
+3. Skip this step when skills are shared across bots (Grok Bot default): the new bot already has them. Only with per-bot skill stores, hand the new bot its shared skills; only it can save them, and without them it ignores its own Safety and References lines. If its profile has `Safety:`, send bot-safety-check; if it has `References:`, send bot-references. Message the bot with the skill name, the full `ROOT/botkit/skills/<name>/SKILL.md` content, and the instruction to save it through its skill tool under that name (Grok Bot: `UpdateSkill`, action `write`), following "Saving one botkit skill" in botkit's AGENTS.md, then reply with the note. Confirm to the owner what you sent and the replies. If sending fails, say so and give the owner the one-line instruction to paste into that bot.
+4. Write 6-30 scenarios (start near 10) in `ROOT/evals/<name>.json` and run them with the evaluate-a-grok-bot skill before the bot goes live; re-run after every profile or skill change.
+5. Add the bot to the fleet file: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When a bot's purpose changes, update its line too.
+6. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.

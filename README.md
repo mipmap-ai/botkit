@@ -193,7 +193,7 @@ python3 scripts/public_safety_scan.py
 
 After changing `botkit.py` or any example or golden JSON input, run `python3 scripts/regen.py` and commit the regenerated files. CI runs the tests, the regen check and the safety cases on Python 3.10 to 3.13, plus the public-safety scan.
 
-This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them. The only third-party names and links allowed are credits below, with their license.
+This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them. The only other names and links allowed are botkit's own repo, the public avatar site `https://botbuilder.mipmap.ai/`, and the third-party projects credited below with their license (pstack, which the shared skills also name).
 
 ## Credits
 

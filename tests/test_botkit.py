@@ -655,5 +655,28 @@ class DocsTest(unittest.TestCase):
         for text in (agents, read("README.md"), design):
             self.assertIn("one library", text)
 
+    def test_design_after_create_includes_avatar(self):
+        design = read("skills/design-a-grok-bot/SKILL.md")
+        for heading in ("## Coding bots", "## Non-coding bots", "## Avatar (every new bot)"):
+            self.assertIn(f"\n{heading}\n", design)
+        self.assertIn('"Avatar (every new bot)"', section(design, "## After create"))
+        avatar = section(design, "## Avatar (every new bot)")
+        for needle in ("Randomize", "Centered", "2048 x 2048", "ROOT/avatars/<bot-name>.png",
+                       "up to 3 tries", "UpdateAvatar"):
+            self.assertIn(needle, avatar)
+
+    def test_only_allowed_org_urls(self):
+        allowed = {"https://github.com/mipmap-ai/botkit", "https://botbuilder.mipmap.ai/"}
+        files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
+                               text=True).stdout.split()
+        for rel in files:
+            path = ROOT / rel
+            if not path.is_file():
+                continue
+            for url in re.findall(r"https?://[^\s`'\"()<>]*mipmap[^\s`'\"()<>]*", path.read_text(errors="replace")):
+                with self.subTest(file=rel, url=url):
+                    self.assertTrue(any(url.rstrip(".,").startswith(a.rstrip("/")) for a in allowed), url)
+
+
 if __name__ == "__main__":
     unittest.main()

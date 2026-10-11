@@ -28,6 +28,7 @@ ROOT/
   safety/              your safety check programs (optional)
   safety/tests/        unittest suite for them (optional, instead of cases files)
   references/          reference files plus INDEX.md (optional)
+  avatars/<name>.png   each bot's picture (design-a-grok-bot)
 ```
 
 The fleet file is `ROOT/fleet.json` unless `BOTKIT_FLEET` names another path; `botkit.py profile --fleet PATH` overrides both. Below, "the fleet file" means that path. `profile` checks it: every value a string, and a warning if the bot of `--json ROOT/bots/<name>.json` has no `<name>` line. A missing, malformed or directory path from `--fleet` or `BOTKIT_FLEET` is an error; the same problem with the default `ROOT/fleet.json` (as in a dev clone) only warns and skips the check.
@@ -109,7 +110,7 @@ python3 scripts/run_safety_cases.py
 python3 scripts/public_safety_scan.py
 ```
 
-This repo is public. No real names, emails, phone numbers, account IDs, org or repo names other than botkit, hostnames, avatar sites or personal paths. Use neutral placeholders (`owner`, `inbox-bot`, `ROOT`). Two exceptions: botkit's own repo URL (`https://github.com/mipmap-ai/botkit`, including its org name), and the README's Credits section, which may name and link third-party projects botkit adapts, with their license.
+This repo is public. No real names, emails, phone numbers, account IDs, org or repo names other than botkit, hostnames, avatar sites or personal paths. Use neutral placeholders (`owner`, `inbox-bot`, `ROOT`). Exceptions: botkit's own repo URL (`https://github.com/mipmap-ai/botkit`, including its org name); the public avatar site `https://botbuilder.mipmap.ai/` used by design-a-grok-bot; and third-party projects botkit adapts or builds on (pstack and its skills), named in shared skills and credited with their license in the README's Credits section.
 
 ## Writing profile fields
 
