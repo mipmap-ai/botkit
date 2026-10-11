@@ -47,6 +47,23 @@ class SafetyContractTest(unittest.TestCase):
             with self.subTest(args=args):
                 self.assertResult(check(*args), want)
 
+    def test_phrases_match_after_normalizing(self):
+        cases = [
+            "what's the verification  code",
+            "buy a gift\tcard",
+            "buy a gift\ncard",
+            "buy a gift \r\n\t card",
+            "please \uff30\uff21\uff39 now",
+            "VERIFICATION CODE",
+        ]
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertResult(check("--from", "owner", "--text", text), "NEEDS_HUMAN")
+
+    def test_sender_normalized(self):
+        self.assertResult(check("--from", "\uff4f\uff57\uff4e\uff45\uff52", "--text", "hi"), "ALLOW")
+        self.assertResult(check("--from", "known-spammer\n", "--text", "hi"), "IGNORE")
+
     def test_bad_input_fails_closed(self):
         bad_json = self.config("{nope")
         wrong_shape = self.config({"allow": "owner"})

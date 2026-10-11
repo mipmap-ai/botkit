@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate every committed generated file from its JSON input via botkit.
 
-  examples/profiles/<bot>.json -> examples/profiles/<bot>.txt  (profile)
-  tests/golden/<kind>*.json    -> tests/golden/<kind>*.txt     (kind from file name)
+  examples/profiles/<bot>.json -> examples/profiles/<bot>.md  (profile)
+  tests/golden/<kind>*.json    -> tests/golden/<kind>*.md     (kind from file name)
 
 With --check, write nothing and exit 1 if any file differs.
 """
@@ -29,7 +29,7 @@ def targets():
     inputs = sorted((ROOT / "examples" / "profiles").glob("*.json"))
     inputs += sorted((ROOT / "tests" / "golden").glob("*.json"))
     for src in inputs:
-        yield src, src.with_suffix(".txt"), kind_for(src)
+        yield src, src.with_suffix(".md"), kind_for(src)
 
 
 def expected(src, kind):
