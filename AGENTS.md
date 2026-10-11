@@ -32,12 +32,7 @@ ROOT/
 Follow these steps in order. Do each one yourself; ask the owner only where a step says to.
 
 1. **Get the repo.** If `ROOT/botkit` is already a git checkout of botkit, run `git -C ROOT/botkit pull --ff-only`. Otherwise run `git clone <botkit repo URL> ROOT/botkit`. Check that `python3 --version` is 3.10 or newer.
-2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order:
-   1. Read the file's exact content. The skill's name is `<folder>`; it also matches the `name:` in its frontmatter.
-   2. Read your existing skill of that name through your skill tool, if one exists.
-   3. If it exists with identical content, skip it and note `skip <folder> (same)`.
-   4. If it doesn't exist, save it through your skill tool under the name `<folder>` with the full file content (Grok Bot: `UpdateSkill`, action `write`), then note `saved <folder>`.
-   5. If it exists with different content, leave it as it is and note `differs <folder>`. Tell the owner and overwrite only on their yes; updates are handled in the update steps below.
+2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order, follow "Saving one botkit skill" below.
 3. **Create the fleet file.** If `ROOT/fleet.json` doesn't exist, copy `ROOT/botkit/examples/fleet.example.json` to it. If it exists, leave it untouched. Then, with the owner, replace the three sample bots with the real ones.
 4. **Create the bots folder.** Make `ROOT/bots/` if it's missing. Each bot's input lives at `ROOT/bots/<name>.json`, next to `fleet.json`.
 5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check` and `inbound-check.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) with the owner, then test an allow, a needs-human and an ignore case before any profile points at it.
@@ -50,17 +45,38 @@ Follow these steps in order. Do each one yourself; ask the owner only where a st
 
    Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Add or update the bot's line in `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`.
 
+### Saving one botkit skill
+
+Used by install step 2 and update step 4.
+
+1. Read `ROOT/botkit/skills/<folder>/SKILL.md` exactly. The skill's name is `<folder>`; it also matches the `name:` in its frontmatter.
+2. Read your existing skill of that name through your skill tool, if one exists.
+3. **Missing:** save it through your skill tool under the name `<folder>` with the full file content (Grok Bot: `UpdateSkill`, action `write`). Note `saved <folder>`.
+4. **Identical content:** skip it without asking. Note `skip <folder> (same)`.
+5. **Different content:** stop and ask the owner before touching it. Ask one question for this skill alone and wait for the answer before moving to the next skill. The question holds:
+   - the skill name;
+   - a short summary of what differs, by section (frontmatter fields and `#` headings): sections only in botkit's version, sections only in yours, and sections in both whose text differs, each with a few words on the change. No full diff. In the update steps, also say whether your copy matches botkit's previous version (`git -C ROOT/botkit show "$OLD:skills/<folder>/SKILL.md"`), meaning it has no local changes;
+   - the three options:
+     - **Replace:** overwrite it with botkit's version.
+     - **Merge:** combine the two, keeping your local additions and adopting botkit's changes.
+     - **Skip:** leave the existing skill as it is.
+
+   Then act on the answer:
+   - **Replace:** save botkit's full content. Note `replaced <folder>`.
+   - **Merge:** build the merged skill. Start from botkit's version, then add back what exists only in yours: whole sections, lines inside shared sections, and local edits to text botkit didn't change. In the update steps, use botkit's previous version as the common base to tell your additions from botkit's changes. Where both changed the same text, show both versions and let the owner pick. Show the full merged result and save it only on the owner's yes, then note `merged <folder>`. On anything but yes, ask the three options again.
+   - **Skip**, or no answer: change nothing. Note `kept <folder> (differs)`.
+
 Rules:
 
 - Never put real fleet data, bot names, owner names or private paths in the repo. Don't write anything inside `ROOT/botkit` and don't commit from it on a bot computer.
-- Re-running steps 1 to 7 is safe: existing files, folders and identical skills are skipped, and regenerating a profile from unchanged input produces the same bytes.
+- Nothing that already exists changes without the owner's answer. Re-running steps 1 to 7 is safe: existing files and folders are left alone, identical skills are skipped silently, a skill that differs changes only after the owner picks Replace or approves a Merge, and regenerating a profile from unchanged input produces the same bytes.
 
 To update botkit:
 
 1. Note the current commit: `OLD=$(git -C ROOT/botkit rev-parse HEAD)`.
 2. Run `git -C ROOT/botkit pull --ff-only`.
 3. List the skills that changed: `git -C ROOT/botkit diff --name-only "$OLD" HEAD -- skills/`.
-4. Re-save only those skills through your skill tool, each under its folder name with the new full content. Leave every other skill alone.
+4. For each of those skills only, follow "Saving one botkit skill" above, including the Replace, Merge or Skip question when your copy differs. Leave every other skill alone.
 5. If `botkit.py` changed, regenerate each profile as in step 7. Paste a profile again only if its `.md` changed.
 
 ## Before you commit

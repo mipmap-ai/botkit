@@ -100,7 +100,7 @@ Test it with a few allow, needs-human and ignore cases before pointing a profile
 
 ## Skill format
 
-Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it saves it through its own skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content); a file on disk does nothing. Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Only the sections that apply:
+Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it saves it through its own skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content); a file on disk does nothing. If a skill of that name already exists with different content, don't overwrite or skip it silently: give the owner a short summary of what differs (sections added, removed or changed) and ask Replace (take the new version), Merge (keep their additions, adopt the new changes; show the merged result and save only on yes) or Skip (leave it). Identical content needs no question. Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Only the sections that apply:
 
 ```
 Purpose:

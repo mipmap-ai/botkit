@@ -13,7 +13,7 @@ A bot only knows a skill once it saves it through its own skill tool, so there's
 
 > Follow the "Installing botkit on a bot computer" steps in botkit's AGENTS.md.
 
-The bot clones the repo, saves the shared skills through its skill tool, and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists. AGENTS.md also has the update steps.
+The bot clones the repo, saves the shared skills through its skill tool, and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps.
 
 To use botkit on your own machine, clone the repo and run `python3 botkit.py` from the clone.
 
