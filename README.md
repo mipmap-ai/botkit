@@ -5,34 +5,17 @@ Versioned public templates for Grok Bot profiles and skills, plus a deterministi
 - A **Grok Bot** is a long-running AI agent with its own computer, chats and scheduled routines; its profile (the description it's created with) is its whole persona, re-read on every wake.
 - **Jev** is a scoring API used for yes/no judgments: a skill sends it fixed questions plus an input and gets a score per question back.
 
-`botkit.py` is one file, Python 3.10+, standard library only. It prints bot profiles and skills in a fixed format, and sets up a bot computer with shared skills, a fleet file and a sample safety check.
+`botkit.py` is one file, Python 3.10+, standard library only. It prints bot profiles and skills in a fixed format: `profile`, `skill` and `jev-skill` are its only commands.
 
-## Setup
+## Use it with your bots
 
-Clone this repo onto the bot computer and run botkit from the clone; `init` copies files from the clone's `skills/` and `examples/` folders.
+A bot only knows a skill once it saves it through its own skill tool, so there's nothing to install by copying files. Instead, tell your bot:
 
-```sh
-cd botkit
-python3 botkit.py init
-```
+> Follow the "Installing botkit on a bot computer" steps in botkit's AGENTS.md.
 
-`init` writes into the bot computer's workspace (`--root`, default `/workspace`). The root must already exist; `init` won't create it.
+The bot clones the repo, saves the shared skills through its skill tool, and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists. AGENTS.md also has the update steps.
 
-| What | Where |
-| --- | --- |
-| shared skills from `skills/` | `ROOT/.cursor/skills/` (change with `--skills-dir DIR`) |
-| fleet file from `examples/fleet.example.json` | `ROOT/fleet.json` |
-| sample safety check from `examples/safety/` | `ROOT/safety/` |
-| empty reference index | `ROOT/references/INDEX.md` |
-| empty folder for your bots' JSON inputs and generated profiles | `ROOT/bots/` |
-
-It never overwrites anything. Each file that already exists is reported as `skip <path> (exists)` and left alone, so running it again is safe. At the end it prints a checklist of what's left to do by hand.
-
-To try it somewhere harmless first:
-
-```sh
-mkdir -p /tmp/botroot && python3 botkit.py init --root /tmp/botroot
-```
+To use botkit on your own machine, clone the repo and run `python3 botkit.py` from the clone.
 
 ## Inputs and outputs
 
@@ -43,10 +26,10 @@ Every bot has two files. Keep both; only the second goes into the bot.
 | `<bot>.json` | the **input**: the profile's fields as JSON. Edit this. |
 | `<bot>.md` | the **generated profile**, printed by `botkit.py profile --json <bot>.json`. This is the only thing you paste into a bot as its description. Never edit it by hand. |
 
-`examples/profiles/` has this pair for each of the three sample bots (inbox-bot, feed-bot and infra-bot). On a bot computer, keep your own inputs in `ROOT/bots/<name>.json` (`init` creates the empty `ROOT/bots/` folder next to `fleet.json`) and generate each profile beside its input:
+`examples/profiles/` has this pair for each of the three sample bots (inbox-bot, feed-bot and infra-bot). On a bot computer, your own inputs live in a private `bots/` folder next to your fleet file, outside the clone (see AGENTS.md), and each profile is generated beside its input:
 
 ```text
-python3 botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md
+python3 botkit/botkit.py profile --json bots/<name>.json -o bots/<name>.md
 ```
 
 Field names: JSON keys are the plural field names (`responsibilities`, `boundaries`, `references`, `steps`, `questions`, `thresholds`), and the flags are singular (`--responsibility`, `--boundary`, `--reference`, `--step`, `--question`, `--threshold`); repeat a flag for each list item. The plural flag spellings also work. In JSON a list field takes a string or a list of strings.
