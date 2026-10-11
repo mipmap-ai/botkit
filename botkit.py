@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""botkit: generate Grok Bot profiles and skills.
+"""botkit: generate Grok Bot profiles, skills and eval scenarios.
 
 Stdlib only. Output is deterministic: fixed section order, items in input
 order, LF line endings, one trailing newline.
@@ -9,6 +9,7 @@ import argparse
 import json
 import re
 import sys
+from pathlib import Path
 
 __version__ = "0.1.0"
 
@@ -155,7 +156,162 @@ def _section(label, items):
     return [f"{label}:"] + [f"- {item}" for item in items]
 
 
+CHECKS = ("tool_called", "tool_not_called", "output_contains", "output_not_contains",
+          "safety_token", "no_output")
+NEGATIVE_TYPES = ("adjacent-action", "out-of-scope", "injected-instruction", "quiet")
+SAFETY_TOKENS = ("ALLOW", "NEEDS_HUMAN", "IGNORE")
+TOOL_NAME = re.compile(r"^[A-Za-z0-9_.:-]+$")
+GIVEAWAY = re.compile(r"(?i)\b(?:evals?|evaluat\w*|tests?|testing|tested|judge[sd]?|judging)\b")
+SCENARIO_KEYS = ("id", "kind", "negative_type", "setup", "prompt", "checks", "jev_question")
+
+
+def _line(where, value, what):
+    if not isinstance(value, str) or not value.strip():
+        raise BotkitError(f"{where}: '{what}' must be a non-empty string")
+    if "\n" in value or "\r" in value:
+        raise BotkitError(f"{where}: '{what}' must be one line")
+    return value.strip()
+
+
+def _check(where, raw):
+    if not isinstance(raw, dict) or set(raw) - {"type", "value"} or "type" not in raw:
+        raise BotkitError(f"{where}: each check is {{\"type\": ..., \"value\": ...}}")
+    ctype = raw["type"]
+    if ctype not in CHECKS:
+        raise BotkitError(f"{where}: unknown check type {ctype!r} (known: {', '.join(CHECKS)})")
+    if ctype == "no_output":
+        if "value" in raw:
+            raise BotkitError(f"{where}: check 'no_output' takes no value")
+        return ctype
+    value = _line(where, raw.get("value"), f"{ctype} value")
+    if ctype in ("tool_called", "tool_not_called"):
+        if not TOOL_NAME.match(value):
+            raise BotkitError(f"{where}: tool name must be a bare identifier, got {value!r}")
+        return f"{ctype} {value}"
+    if ctype == "safety_token":
+        if value not in SAFETY_TOKENS:
+            raise BotkitError(f"{where}: safety_token must be one of {', '.join(SAFETY_TOKENS)}")
+        return f"{ctype} {value}"
+    return f"{ctype} " + json.dumps(value, ensure_ascii=False)
+
+
+def _jev(where, raw):
+    if not isinstance(raw, dict) or set(raw) != {"question", "threshold"}:
+        raise BotkitError(f"{where}: jev_question is {{\"question\": ..., \"threshold\": ...}}")
+    question = _line(where, raw["question"], "jev_question.question")
+    if not QUESTION.match(question):
+        raise BotkitError(f"{where}: jev question must read 'name (yes/no): what a yes means', got {question!r}")
+    t = raw["threshold"]
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or not 0 < t <= 1:
+        raise BotkitError(f"{where}: jev threshold must be a number in (0, 1], got {t!r}")
+    return f"{question} >= {format(t, 'g')}"
+
+
+def render_evals(data):
+    unknown = sorted(set(data) - {"bot", "scenarios"})
+    if unknown:
+        raise BotkitError(f"unknown field(s) for evals: {', '.join(unknown)} (known: bot, scenarios)")
+    bot = data.get("bot")
+    if not isinstance(bot, str) or not SKILL_NAME.match(bot):
+        raise BotkitError("field 'bot': required, lowercase words joined by '-'")
+    scenarios = data.get("scenarios")
+    if not isinstance(scenarios, list) or not 6 <= len(scenarios) <= 10:
+        raise BotkitError("field 'scenarios': required, a list of 6 to 10 scenarios")
+
+    blocks = [_section("Bot", [bot])]
+    seen, kinds, negatives = set(), [], []
+    for n, sc in enumerate(scenarios, 1):
+        where = f"scenario {n}"
+        if not isinstance(sc, dict):
+            raise BotkitError(f"{where}: must be a JSON object")
+        unknown = sorted(set(sc) - set(SCENARIO_KEYS))
+        if unknown:
+            raise BotkitError(f"{where}: unknown field(s): {', '.join(unknown)} (known: {', '.join(SCENARIO_KEYS)})")
+        missing = [k for k in ("id", "kind", "prompt", "checks") if k not in sc]
+        if missing:
+            raise BotkitError(f"{where}: missing required field(s): {', '.join(missing)}")
+        sid = sc["id"]
+        if not isinstance(sid, str) or not SKILL_NAME.match(sid):
+            raise BotkitError(f"{where}: 'id' must be lowercase words joined by '-'")
+        where = f"scenario {n} ({sid})"
+        if sid in seen:
+            raise BotkitError(f"{where}: duplicate id")
+        seen.add(sid)
+        kind = sc["kind"]
+        if kind not in ("positive", "negative"):
+            raise BotkitError(f"{where}: 'kind' must be 'positive' or 'negative'")
+        if kind == "negative":
+            ntype = sc.get("negative_type")
+            if ntype not in NEGATIVE_TYPES:
+                raise BotkitError(f"{where}: negative scenarios need 'negative_type', one of {', '.join(NEGATIVE_TYPES)}")
+            negatives.append(ntype)
+            kind_line = f"negative ({ntype})"
+        else:
+            if "negative_type" in sc:
+                raise BotkitError(f"{where}: 'negative_type' is only for negative scenarios")
+            kind_line = "positive"
+        kinds.append(kind)
+        prompt = _line(where, sc["prompt"], "prompt")
+        word = GIVEAWAY.search(prompt)
+        if word:
+            raise BotkitError(f"{where}: prompt must read like a normal request; drop {word.group(0)!r}")
+        checks = sc["checks"]
+        if not isinstance(checks, list) or not checks:
+            raise BotkitError(f"{where}: 'checks' must be a non-empty list")
+        items = [f"id: {sid}", f"kind: {kind_line}"]
+        if "setup" in sc:
+            items.append(f"setup: {_line(where, sc['setup'], 'setup')}")
+        items.append(f"prompt: {prompt}")
+        items += [f"check: {_check(where, c)}" for c in checks]
+        if "jev_question" in sc:
+            items.append(f"jev: {_jev(where, sc['jev_question'])}")
+        blocks.append(_section("Scenario", items))
+
+    if kinds.count("positive") < 3 or kinds.count("negative") < 3:
+        raise BotkitError(
+            f"need at least 3 positive and 3 negative scenarios, got "
+            f"{kinds.count('positive')} positive and {kinds.count('negative')} negative"
+        )
+    if "injected-instruction" not in negatives:
+        raise BotkitError("need at least one negative scenario with negative_type 'injected-instruction'")
+    return "\n\n".join("\n".join(b) for b in blocks) + "\n"
+
+
+SKILL_PATH = re.compile(r"(?<![\w.-])skills/([a-z0-9]+(?:-[a-z0-9]+)*)")
+SKILL_PHRASE = re.compile(r"\b([a-z0-9]+(?:-[a-z0-9]+)+) skill\b")
+REFERENCE_PATH = re.compile(r"(?<![\w.-])references/([^\s`'\"(),;:{}<>]+)")
+
+
+def check_links(kind, data, root):
+    """Fail if an item names a skill folder or references/ file missing under root.
+
+    Skills are found at ROOT/skills/<name>/SKILL.md or ROOT/botkit/skills/<name>/SKILL.md;
+    references at ROOT/references/<file>.
+    """
+    root = Path(root)
+    if not root.is_dir():
+        raise BotkitError(f"--root {root} is not a directory")
+    f = normalize(kind, data)
+    for key in ("purpose", "input", "questions", "steps", "decide", "thresholds", "jev_down", "run", "never"):
+        for n, item in enumerate(f.get(key, []), 1):
+            where = f"field '{key}' item {n}"
+            names = set(SKILL_PATH.findall(item)) | set(SKILL_PHRASE.findall(item))
+            for name in sorted(names):
+                if not any((base / "skills" / name / "SKILL.md").is_file()
+                           for base in (root, root / "botkit")):
+                    raise BotkitError(
+                        f"{where} names skill '{name}', but there is no {name}/SKILL.md "
+                        f"under {root / 'skills'} or {root / 'botkit' / 'skills'}"
+                    )
+            for ref in sorted(set(REFERENCE_PATH.findall(item))):
+                ref = ref.rstrip(".")
+                if ".." in ref.split("/") or not (root / "references" / ref).is_file():
+                    raise BotkitError(f"{where} names references/{ref}, but {root / 'references' / ref} does not exist")
+
+
 def render(kind, data):
+    if kind == "evals":
+        return render_evals(data)
     f = normalize(kind, data)
     if kind == "profile":
         lines = []
@@ -231,14 +387,22 @@ def cmd_generate(args):
         data = _load_json(args.json)
     else:
         data = flags
-    _write(render(kind, data), args.out)
+    text = render(kind, data)
+    if getattr(args, "root", None) is not None:
+        check_links(kind, data, args.root)
+    _write(text, args.out)
+    return 0
+
+
+def cmd_evals(args):
+    _write(render("evals", _load_json(args.json)), args.out)
     return 0
 
 
 def build_parser():
     p = argparse.ArgumentParser(
         prog="botkit",
-        description="Generate Grok Bot profiles and skills.",
+        description="Generate Grok Bot profiles, skills and eval scenarios.",
     )
     p.add_argument("--version", action="version", version=f"botkit {__version__}")
     sub = p.add_subparsers(dest="command", metavar="COMMAND")
@@ -252,9 +416,21 @@ def build_parser():
         sp = sub.add_parser(kind, help=helps[kind], description=helps[kind] + ".")
         sp.add_argument("--json", metavar="FILE", help="read fields from a JSON object ('-' for stdin)")
         sp.add_argument("-o", "--out", metavar="FILE", help="write to FILE instead of stdout")
+        if kind != "profile":
+            sp.add_argument(
+                "--root", metavar="DIR",
+                help="fail if an item names a skill (skills/<name> or '<name> skill') or a "
+                     "references/<file> missing under DIR (skills also found in DIR/botkit/skills)")
         for f in spec:
             sp.add_argument(*f.flags, dest=f.key, action="append", metavar="TEXT", help=f.help)
         sp.set_defaults(func=cmd_generate)
+    ep = sub.add_parser(
+        "evals", help="validate and print a bot's eval scenarios",
+        description="Validate and print a bot's eval scenarios: 6 to 10, at least 3 positive "
+                    "and 3 negative, at least one negative of type injected-instruction.")
+    ep.add_argument("--json", metavar="FILE", required=True, help="scenario file ('-' for stdin)")
+    ep.add_argument("-o", "--out", metavar="FILE", help="write to FILE instead of stdout")
+    ep.set_defaults(func=cmd_evals)
     return p
 
 

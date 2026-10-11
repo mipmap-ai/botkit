@@ -2,6 +2,7 @@
 """Regenerate every committed generated file from its JSON input via botkit.
 
   examples/profiles/<bot>.json -> examples/profiles/<bot>.md  (profile)
+  examples/evals/<bot>.json    -> examples/evals/<bot>.md     (evals)
   tests/golden/<kind>*.json    -> tests/golden/<kind>*.md     (kind from file name)
 
 With --check, write nothing and exit 1 if any file differs.
@@ -17,9 +18,9 @@ import botkit  # noqa: E402
 
 
 def kind_for(path):
-    if path.parent.name == "profiles":
-        return "profile"
-    for kind in ("jev-skill", "skill", "profile"):
+    if path.parent.name in ("profiles", "evals"):
+        return {"profiles": "profile", "evals": "evals"}[path.parent.name]
+    for kind in ("evals", "jev-skill", "skill", "profile"):
         if path.name.startswith(kind):
             return kind
     raise SystemExit(f"cannot tell template kind for {path}")
@@ -27,6 +28,7 @@ def kind_for(path):
 
 def targets():
     inputs = sorted((ROOT / "examples" / "profiles").glob("*.json"))
+    inputs += sorted((ROOT / "examples" / "evals").glob("*.json"))
     inputs += sorted((ROOT / "tests" / "golden").glob("*.json"))
     for src in inputs:
         yield src, src.with_suffix(".md"), kind_for(src)

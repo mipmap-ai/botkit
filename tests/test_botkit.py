@@ -17,6 +17,7 @@ GOLDEN_CASES = {
     "profile-minimal": "profile",
     "skill": "skill",
     "jev-skill": "jev-skill",
+    "evals": "evals",
 }
 
 
@@ -25,6 +26,10 @@ def botkit(*args, stdin=None):
         [sys.executable, str(BOTKIT), *map(str, args)],
         capture_output=True, input=stdin, cwd=ROOT,
     )
+
+
+def unique(items):
+    return list(dict.fromkeys(items))
 
 
 def headers(text):
@@ -101,12 +106,20 @@ class GenerateTest(unittest.TestCase):
             "profile": "profile-full",
             "skill": "skill",
             "jev-skill": "jev-skill",
+            "evals": "evals",
         }
         for kind, case in full.items():
             with self.subTest(kind):
                 template = (ROOT / "templates" / f"{kind}.md").read_text(encoding="utf-8")
                 golden = (GOLDEN / f"{case}.md").read_text(encoding="utf-8")
-                self.assertEqual(headers(template), headers(golden))
+                self.assertEqual(unique(headers(template)), unique(headers(golden)))
+
+    def test_example_evals_match_regenerated(self):
+        jsons = sorted((EXAMPLES / "evals").glob("*.json"))
+        self.assertEqual([p.stem for p in jsons], ["inbox-bot"])
+        for src in jsons:
+            fresh = self.assertOk(botkit("evals", "--json", src))
+            self.assertEqual(src.with_suffix(".md").read_bytes(), fresh)
 
 
 class OmitTest(unittest.TestCase):
@@ -220,11 +233,175 @@ class ErrorTest(unittest.TestCase):
             self.assertEqual(r.stdout, b"")
 
 
+def golden_evals():
+    return json.loads((GOLDEN / "evals.json").read_text(encoding="utf-8"))
+
+
+class EvalsErrorTest(unittest.TestCase):
+    def run_evals(self, data):
+        fh = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        json.dump(data, fh)
+        fh.close()
+        self.addCleanup(os.unlink, fh.name)
+        return botkit("evals", "--json", fh.name)
+
+    def assertEvalsFail(self, data, needle):
+        r = self.run_evals(data)
+        self.assertEqual(r.returncode, 2, r.stdout.decode())
+        self.assertEqual(r.stdout, b"")
+        err = r.stderr.decode()
+        self.assertTrue(err.startswith("botkit: error: "), err)
+        self.assertIn(needle, err)
+        self.assertNotIn("Traceback", err)
+
+    def mutate(self, index, **changes):
+        data = golden_evals()
+        sc = data["scenarios"][index]
+        for key, value in changes.items():
+            if value is None:
+                sc.pop(key, None)
+            else:
+                sc[key] = value
+        return data
+
+    def test_golden_is_valid(self):
+        self.assertEqual(self.run_evals(golden_evals()).returncode, 0)
+
+    def test_counts(self):
+        data = golden_evals()
+        data["scenarios"] = data["scenarios"][:5]
+        self.assertEvalsFail(data, "6 to 10")
+        data = golden_evals()
+        data["scenarios"] += data["scenarios"][:4]
+        self.assertEvalsFail(data, "6 to 10")
+        data = golden_evals()
+        data["scenarios"][1] = dict(data["scenarios"][4], id="another-out-of-scope")
+        self.assertEvalsFail(data, "at least 3 positive and 3 negative")
+        data = golden_evals()
+        for sc in data["scenarios"][3:]:
+            sc["negative_type"] = "out-of-scope"
+        self.assertEvalsFail(data, "injected-instruction")
+
+    def test_field_errors(self):
+        cases = [
+            (self.mutate(0, id=None), "missing required field(s): id"),
+            (self.mutate(0, checks=None), "missing required field(s): checks"),
+            (self.mutate(0, rubric="x"), "unknown field(s): rubric"),
+            (self.mutate(1, id="morning-digest"), "duplicate id"),
+            (self.mutate(0, id="Bad Id"), "'id'"),
+            (self.mutate(0, kind="neutral"), "'kind'"),
+            (self.mutate(3, negative_type=None), "need 'negative_type'"),
+            (self.mutate(0, negative_type="quiet"), "only for negative"),
+            (self.mutate(0, prompt="  "), "'prompt'"),
+            (self.mutate(0, prompt="line one\nline two"), "one line"),
+            (self.mutate(0, checks=[]), "non-empty list"),
+            (self.mutate(0, checks=[{"type": "looks_good", "value": "x"}]), "unknown check type"),
+            (self.mutate(0, checks=[{"type": "tool_called"}]), "tool_called value"),
+            (self.mutate(0, checks=[{"type": "tool_called", "value": "send mail"}]), "bare identifier"),
+            (self.mutate(0, checks=[{"type": "safety_token", "value": "OK"}]), "safety_token must be"),
+            (self.mutate(0, checks=[{"type": "no_output", "value": "x"}]), "takes no value"),
+            (self.mutate(0, checks=["tool_called x"]), "each check"),
+            (self.mutate(1, jev_question={"question": "is it on topic?", "threshold": 0.5}), "jev question"),
+            (self.mutate(1, jev_question={"question": "q (yes/no): a", "threshold": 1.5}), "threshold"),
+            (self.mutate(1, jev_question={"question": "q (yes/no): a", "threshold": True}), "threshold"),
+            (self.mutate(1, jev_question={"question": "q (yes/no): a"}), "jev_question is"),
+        ]
+        for data, needle in cases:
+            with self.subTest(needle=needle):
+                self.assertEvalsFail(data, needle)
+
+    def test_prompt_must_not_give_it_away(self):
+        for prompt in ("this is a test: send it", "Eval: draft a reply", "judge whether to send",
+                       "we're testing you", "evaluate my inbox"):
+            with self.subTest(prompt=prompt):
+                self.assertEvalsFail(self.mutate(0, prompt=prompt), "normal request")
+        self.assertEqual(self.run_evals(self.mutate(0, prompt="latest contest results?")).returncode, 0)
+
+    def test_top_level_errors(self):
+        data = golden_evals()
+        data["owner"] = "x"
+        self.assertEvalsFail(data, "unknown field(s) for evals: owner")
+        data = golden_evals()
+        data["bot"] = "Feed Bot"
+        self.assertEvalsFail(data, "field 'bot'")
+        r = botkit("evals")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("--json", r.stderr.decode())
+
+
+class LinkCheckTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        (self.root / "skills" / "bot-references").mkdir(parents=True)
+        (self.root / "skills" / "bot-references" / "SKILL.md").write_text("x\n")
+        (self.root / "botkit" / "skills" / "bot-safety-check").mkdir(parents=True)
+        (self.root / "botkit" / "skills" / "bot-safety-check" / "SKILL.md").write_text("x\n")
+        (self.root / "references").mkdir()
+        (self.root / "references" / "runbook.md").write_text("x\n")
+
+    def skill(self, *steps, kind="skill"):
+        args = [kind, "--root", self.root, "--purpose", "p"]
+        for s in steps:
+            args += ["--step", s]
+        if kind == "jev-skill":
+            args += ["--question", "q (yes/no): a", "--threshold", "q >= 0.8", "--jev-down", "stop"]
+        return botkit(*args)
+
+    def test_existing_links_pass(self):
+        r = self.skill("follow the bot-references skill",
+                       "read skills/bot-safety-check/SKILL.md",
+                       "open ROOT/references/runbook.md.",
+                       "read references/{file} as listed")
+        self.assertEqual(r.returncode, 0, r.stderr.decode())
+        self.assertEqual(r.stdout, botkit("skill", "--purpose", "p",
+                                          "--step", "follow the bot-references skill",
+                                          "--step", "read skills/bot-safety-check/SKILL.md",
+                                          "--step", "open ROOT/references/runbook.md.",
+                                          "--step", "read references/{file} as listed").stdout)
+
+    def test_missing_skill_fails(self):
+        for step in ("follow the design-a-grok-bot skill", "read skills/evaluate-a-grok-bot/SKILL.md"):
+            with self.subTest(step):
+                r = self.skill("first", step)
+                self.assertEqual(r.returncode, 2)
+                self.assertEqual(r.stdout, b"")
+                self.assertIn("field 'steps' item 2 names skill", r.stderr.decode())
+
+    def test_missing_reference_fails(self):
+        r = self.skill("read references/missing.md")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("references/missing.md", r.stderr.decode())
+        r = self.skill("read references/../secrets.md")
+        self.assertEqual(r.returncode, 2)
+
+    def test_jev_skill_checked_too(self):
+        r = self.skill("follow the no-such-thing skill", kind="jev-skill")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("no-such-thing", r.stderr.decode())
+
+    def test_without_root_nothing_is_checked(self):
+        r = botkit("skill", "--purpose", "p", "--step", "follow the no-such-thing skill")
+        self.assertEqual(r.returncode, 0)
+
+    def test_root_must_be_a_directory(self):
+        r = botkit("skill", "--root", self.root / "nope", "--purpose", "p", "--step", "s")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("not a directory", r.stderr.decode())
+
+    def test_repo_skills_resolve_against_repo(self):
+        r = botkit("skill", "--root", ROOT, "--purpose", "p",
+                   "--step", "follow the evaluate-a-grok-bot skill",
+                   "--step", "then the bot-safety-check skill")
+        self.assertEqual(r.returncode, 0, r.stderr.decode())
+
+
 class CommandsTest(unittest.TestCase):
     def test_only_generate_commands(self):
         help_text = botkit("--help").stdout.decode()
         listed = re.findall(r"(?m)^    (\S+)\s{2,}", help_text)
-        self.assertEqual(listed, ["profile", "skill", "jev-skill"])
+        self.assertEqual(listed, ["profile", "skill", "jev-skill", "evals"])
         r = botkit("init")
         self.assertEqual(r.returncode, 2)
         self.assertIn("invalid choice", r.stderr.decode())
@@ -234,7 +411,7 @@ class SkillsTest(unittest.TestCase):
     def test_each_skill_named_after_its_folder(self):
         skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
         self.assertEqual([p.parent.name for p in skills],
-                         ["bot-references", "bot-safety-check", "design-a-grok-bot"])
+                         ["bot-references", "bot-safety-check", "design-a-grok-bot", "evaluate-a-grok-bot"])
         for path in skills:
             with self.subTest(path.parent.name):
                 text = path.read_text(encoding="utf-8")
