@@ -36,7 +36,7 @@ The fleet file is `ROOT/fleet.json` unless `BOTKIT_FLEET` names another path; `b
 Follow these steps in order. Do each one yourself; ask the owner only where a step says to.
 
 1. **Get the repo.** If `ROOT/botkit` doesn't exist, run `git clone https://github.com/mipmap-ai/botkit ROOT/botkit`. If it exists and is a botkit checkout (`git -C ROOT/botkit remote get-url origin` ends in `botkit` or `botkit.git`, and `ROOT/botkit/botkit.py` exists), run `git -C ROOT/botkit pull --ff-only`. If it exists but isn't a botkit checkout, stop: don't move, delete or overwrite it; tell the owner what's there and ask what to do. Check that `python3 --version` is 3.10 or newer.
-2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order, follow "Saving one botkit skill" below. On Grok Bot this saves them for every bot; only with per-bot skill stores do other bots get theirs through "Handing skills to other bots".
+2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md` (bot-references, bot-safety-check, cost-review, design-a-grok-bot, evaluate-a-grok-bot), in name order, follow "Saving one botkit skill" below. On Grok Bot this saves them for every bot; only with per-bot skill stores do other bots get theirs through "Handing skills to other bots".
 3. **Create the fleet file.** If the owner already keeps a fleet file elsewhere, set `BOTKIT_FLEET` to its path and create nothing. Otherwise, if `ROOT/fleet.json` doesn't exist, copy `ROOT/botkit/examples/fleet.example.json` to it. If it exists, leave it untouched. Then, with the owner, replace the three sample bots with the real ones.
 4. **Create the bots folder.** Make `ROOT/bots/` if it's missing. Each bot's input lives at `ROOT/bots/<name>.json`.
 5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check`, `inbound-check.json` and `inbound-check.cases.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) and its cases with the owner. Run its safety tests as in "Safety check programs" below; all must pass before any profile points at it.
@@ -82,6 +82,7 @@ Skip this section when skills are shared across bots, the Grok Bot default: inst
 
 - bot-safety-check: every bot whose profile has `Safety:`.
 - bot-references: every bot whose profile has `References:`.
+- cost-review: every bot that creates or changes its own routines.
 - design-a-grok-bot, evaluate-a-grok-bot: only the bot that designs and evaluates bots (you).
 
 To hand a skill over, message the bot with the skill name, the full `SKILL.md` content in a code block, and the instruction: save it through your skill tool under that name, following botkit's "Saving one botkit skill" (save if missing, skip if identical, ask your owner Replace, Merge or Skip if different), then reply with the note. In the update steps, also give the `$OLD` commit, so a bot whose copy matches botkit's previous version (readable from the shared `ROOT/botkit`) updates without asking. Confirm to the owner what you sent and each bot's reply. If sending fails, say so and give the owner the one-line instruction to paste into that bot.
@@ -187,5 +188,6 @@ Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stde
 | Prompts never show checks or Jev questions to the bot | no enforcer: the evaluate-a-grok-bot skill |
 | Purpose agreed with the owner; Boundaries only from repeated drift | no enforcer: design-a-grok-bot skill and the drift routine |
 | Compressed field style; no owner names in profiles | no enforcer: these field-writing rules |
+| Routines, skills and profiles use the cheapest tier that can decide; routines reviewed before creation | no enforcer: the cost-review skill |
 | Skills with local changes change only after the owner's answer | no enforcer: install and update steps above |
 | Docs agree on safety test forms and on skipping handover for shared skills | `DocsTest` |

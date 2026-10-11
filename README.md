@@ -163,7 +163,7 @@ Run `python3 botkit.py <command> --help` for every flag.
 | --- | --- |
 | `botkit.py` | the CLI |
 | `templates/` | the profile, skill, Jev skill and evals layouts (`profile.md`, `skill.md`, `jev-skill.md`, `evals.md`) |
-| `skills/` | shared skills: designing a bot, evaluating a bot, running safety checks, reading references |
+| `skills/` | shared skills: designing a bot, evaluating a bot, reviewing token cost, running safety checks, reading references |
 | `examples/` | `fleet.example.json`, three sample bots (JSON input and generated `.md` profile), inbox-bot's eval scenarios, and the `inbound-check` safety check with its cases |
 | `routines/` | copyable routine prompts |
 | `scripts/run_safety_cases.py` | runs safety-check cases files |

@@ -37,7 +37,7 @@ Voice:
 - a few words per line
 ```
 
-Every field is a dash list, even with one item, with one blank line between fields: consistent for the model, easy for scripts (drift monitors, fleet checks) to parse. Boundaries, Safety and References are optional and left out entirely when empty.
+Every field is a dash list, even with one item, with one blank line between fields: consistent for the model, easy for scripts (drift monitors, fleet checks) to parse. Boundaries, Safety and References are optional and left out entirely when empty. Check its token cost with `skills/cost-review`.
 
 ### Responsibilities vs routines
 
@@ -105,7 +105,7 @@ Give it safety tests in either form: a cases file `ROOT/safety/<program>.cases.j
 
 ## Skill format
 
-Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it's saved through a skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content; saved once for all the owner's bots); a file on disk does nothing. Save it as in "Saving one botkit skill" in `ROOT/botkit/AGENTS.md` (an existing skill that differs changes only on the owner's Replace or Merge). Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Name another skill by path (`skills/<name>`) and generate with `--root ROOT` so a missing one fails. Only the sections that apply:
+Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it's saved through a skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content; saved once for all the owner's bots); a file on disk does nothing. Save it as in "Saving one botkit skill" in `ROOT/botkit/AGENTS.md` (an existing skill that differs changes only on the owner's Replace or Merge). Check its token cost with `skills/cost-review`. Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Name another skill by path (`skills/<name>`) and generate with `--root ROOT` so a missing one fails. Only the sections that apply:
 
 ```
 Purpose:
@@ -168,4 +168,4 @@ Right after create, without asking, give the bot a picture from https://botbuild
 3. Skip this step when skills are shared across bots (Grok Bot default): the new bot already has them. Only with per-bot skill stores, hand the new bot its shared skills; only it can save them, and without them it ignores its own Safety and References lines. If its profile has `Safety:`, send bot-safety-check; if it has `References:`, send bot-references. Message the bot with the skill name, the full `ROOT/botkit/skills/<name>/SKILL.md` content, and the instruction to save it through its skill tool under that name (Grok Bot: `UpdateSkill`, action `write`), following "Saving one botkit skill" in botkit's AGENTS.md, then reply with the note. Confirm to the owner what you sent and the replies. If sending fails, say so and give the owner the one-line instruction to paste into that bot.
 4. Write 6-30 scenarios (start near 10) in `ROOT/evals/<name>.json` and run them with the evaluate-a-grok-bot skill before the bot goes live; re-run after every profile or skill change.
 5. Add the bot to the fleet file: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When a bot's purpose changes, update its line too.
-6. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.
+6. If the job needs a standing routine, run the cost-review skill (`skills/cost-review`) on it before creating it. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.

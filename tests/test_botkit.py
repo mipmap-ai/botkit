@@ -568,7 +568,8 @@ class SkillsTest(unittest.TestCase):
     def test_each_skill_named_after_its_folder(self):
         skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
         self.assertEqual([p.parent.name for p in skills],
-                         ["bot-references", "bot-safety-check", "design-a-grok-bot", "evaluate-a-grok-bot"])
+                         ["bot-references", "bot-safety-check", "cost-review", "design-a-grok-bot",
+                          "evaluate-a-grok-bot"])
         for path in skills:
             with self.subTest(path.parent.name):
                 text = path.read_text(encoding="utf-8")
@@ -664,6 +665,21 @@ class DocsTest(unittest.TestCase):
         for needle in ("Randomize", "Centered", "2048 x 2048", "ROOT/avatars/<bot-name>.png",
                        "up to 3 tries", "UpdateAvatar"):
             self.assertIn(needle, avatar)
+
+    def test_cost_review_wired_in(self):
+        design = read("skills/design-a-grok-bot/SKILL.md")
+        routine = re.search(r"(?m)^\d\. If the job needs a standing routine.*$",
+                            section(design, "## After create")).group(0)
+        self.assertIn("`skills/cost-review`", routine)
+        for heading in ("## Profile format", "## Skill format"):
+            self.assertIn("`skills/cost-review`", section(design, heading))
+        self.assertIn("`skills/cost-review`", read("routines/README.md"))
+        agents = read("AGENTS.md")
+        install = re.search(r"(?m)^2\. \*\*Save the shared skills\.\*\*.*$", agents).group(0)
+        for name in sorted(p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")):
+            self.assertIn(name, install)
+        self.assertIn("the cost-review skill", section(agents, "## Rules and their enforcers"))
+        self.assertIn("reviewing token cost", read("README.md"))
 
     def test_only_allowed_org_urls(self):
         allowed = {"https://github.com/mipmap-ai/botkit", "https://botbuilder.mipmap.ai/"}
