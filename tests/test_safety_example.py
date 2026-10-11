@@ -60,6 +60,44 @@ class SafetyContractTest(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertResult(check("--from", "owner", "--text", text), "NEEDS_HUMAN")
 
+    def test_invisible_characters_stripped(self):
+        cases = [
+            "buy a gift\u200bcard",
+            "please pa\u00ady me",
+            "please p\u200ca\u200dy\u2060 now",
+            "\ufeffdelete it",
+            "veri\u00adfication code",
+            "pa\u034fy",
+        ]
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertResult(check("--from", "owner", "--text", text), "NEEDS_HUMAN")
+
+    def test_lookalike_letters_folded(self):
+        cases = [
+            "please p\u0430y",
+            "\u0420\u0410\u0423 now",
+            "d\u0435l\u0435t\u0435 it",
+            "\u0440\u0430ssword reset",
+            "p\u03b1y me",
+            "tr\u03b1nsfer funds",
+            "gift c\u0430rd",
+        ]
+        for text in cases:
+            with self.subTest(text=text):
+                self.assertResult(check("--from", "owner", "--text", text), "NEEDS_HUMAN")
+
+    def test_folding_keeps_ordinary_text_allowed(self):
+        for text in ("rewire the lamp", "paying attention", "\u03ba\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1"):
+            with self.subTest(text=text):
+                self.assertResult(check("--from", "owner", "--text", text), "ALLOW")
+        self.assertResult(check("--from", "owner", "--text", "buy a giftcard"), "NEEDS_HUMAN")
+
+    def test_lookalike_sender_not_allowed_but_still_blocked(self):
+        self.assertResult(check("--from", "\u043ewner", "--text", "hi"), "NEEDS_HUMAN")
+        self.assertResult(check("--from", "own\u200ber", "--text", "hi"), "NEEDS_HUMAN")
+        self.assertResult(check("--from", "kn\u043ewn-spammer", "--text", "hi"), "IGNORE")
+
     def test_sender_normalized(self):
         self.assertResult(check("--from", "\uff4f\uff57\uff4e\uff45\uff52", "--text", "hi"), "ALLOW")
         self.assertResult(check("--from", "known-spammer\n", "--text", "hi"), "IGNORE")

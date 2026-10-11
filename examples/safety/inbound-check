@@ -16,8 +16,12 @@ Rules, in order:
 
 The config defaults to inbound-check.json next to this program:
   {"allow": [...], "block": [...], "risky_words": [...]}
-Senders, text and risky words are normalized before comparing: NFKC, casefold,
-every whitespace run collapsed to one space. Risky words match whole words.
+Everything is normalized before comparing: NFKC, casefold, every whitespace
+run collapsed to one space. Text, risky words and the block list are also
+folded: zero-width and other invisible format characters (soft hyphen
+included) are removed and Cyrillic and Greek look-alike letters become Latin.
+The allow list is matched without folding, so a look-alike sender name is not
+allowed. Risky words match whole words; a space inside a phrase may be missing.
 """
 
 import json
@@ -46,8 +50,23 @@ def load_config(path):
         vals = cfg.get(key, [])
         if not isinstance(vals, list) or not all(isinstance(v, str) and v.strip() for v in vals):
             raise BadInput(f"config '{key}' must be a list of non-empty strings")
-        out[key] = [normalize(v) for v in vals]
+        out[key] = [(normalize if key == "allow" else fold)(v) for v in vals]
     return out
+
+
+# Cyrillic and Greek letters that look like Latin ones, keyed by their
+# casefolded form. Several are only look-alikes in upper case (в, н, κ, μ),
+# which casefold maps down; folding them anyway errs toward NEEDS_HUMAN.
+LOOKALIKES = str.maketrans({
+    "а": "a", "в": "b", "е": "e", "ё": "e", "і": "i", "ї": "i",
+    "ј": "j", "к": "k", "м": "m", "н": "h", "о": "o", "р": "p", "с": "c",
+    "т": "t", "у": "y", "х": "x", "ѕ": "s", "ԁ": "d", "ԛ": "q", "ԝ": "w",
+    "һ": "h", "ӏ": "l", "ь": "b",
+    "α": "a", "β": "b", "γ": "y", "ε": "e", "ζ": "z", "η": "n", "ι": "i",
+    "κ": "k", "μ": "m", "ν": "v", "ο": "o", "ρ": "p", "τ": "t", "υ": "u",
+    "χ": "x", "ω": "w",
+})
+INVISIBLE = {"\u034f", "\u115f", "\u1160", "\u3164", "\uffa0"}
 
 
 def normalize(s):
@@ -55,15 +74,27 @@ def normalize(s):
     return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s).casefold()).strip()
 
 
+def fold(s):
+    """normalize, minus zero-width and format characters (soft hyphen
+    included), with Cyrillic and Greek look-alikes mapped to Latin."""
+    s = unicodedata.normalize("NFKC", s)
+    s = "".join(c for c in s if c not in INVISIBLE and unicodedata.category(c) != "Cf")
+    return normalize(s.casefold().translate(LOOKALIKES))
+
+
+def phrase_pattern(phrase):
+    """Whole-word match; a space inside the phrase may also be missing."""
+    return r"(?<!\w)" + " ?".join(map(re.escape, phrase.split(" "))) + r"(?!\w)"
+
+
 def decide(sender, text, cfg):
-    who = normalize(sender)
-    if who in cfg["block"]:
+    if fold(sender) in cfg["block"]:
         return IGNORE, f"sender {sender!r} is blocked"
-    if who not in cfg["allow"]:
+    if normalize(sender) not in cfg["allow"]:
         return NEEDS_HUMAN, f"sender {sender!r} is not on the allow list"
-    norm = normalize(text)
+    folded = fold(text)
     for word in cfg["risky_words"]:
-        if re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", norm):
+        if re.search(phrase_pattern(word), folded):
             return NEEDS_HUMAN, f"text mentions risky word {word!r}"
     return ALLOW, "known sender, no risky words"
 
