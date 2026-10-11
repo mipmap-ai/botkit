@@ -341,16 +341,22 @@ def fleet_path(flag=None):
 def check_fleet(path, explicit, key):
     """Validate the fleet file; warn if it has no line for key.
 
-    A missing default file is skipped; a missing --fleet or $BOTKIT_FLEET file is an error.
+    A bad --fleet or $BOTKIT_FLEET file is an error; a bad default file (a dev
+    clone has none) is skipped with a warning.
     """
-    if not path.is_file():
+    try:
+        if path.is_dir():
+            raise BotkitError(f"fleet file {path} is a directory")
+        if not path.is_file():
+            raise BotkitError(f"fleet file {path} not found")
+        fleet = _load_json(str(path))
+        for k, v in fleet.items():
+            if not isinstance(v, str) or not v.strip():
+                raise BotkitError(f"{path}: fleet line for {k!r} must be \"<name>: <purpose in one line>\"")
+    except BotkitError as e:
         if explicit:
-            raise BotkitError(f"fleet file {path} not found (from --fleet or ${FLEET_ENV})")
-        return []
-    fleet = _load_json(str(path))
-    for k, v in fleet.items():
-        if not isinstance(v, str) or not v.strip():
-            raise BotkitError(f"{path}: fleet line for {k!r} must be \"<name>: <purpose in one line>\"")
+            raise BotkitError(f"{e} (from --fleet or ${FLEET_ENV})")
+        return [f"{e}; fleet check skipped (set --fleet or ${FLEET_ENV})"]
     if key is not None and key not in fleet:
         return [f"{path} has no line for '{key}'; add \"{key}\": \"<name>: <purpose in one line>\""]
     return []

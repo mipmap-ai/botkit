@@ -218,6 +218,7 @@ class FleetTest(unittest.TestCase):
         clone = self.dir / "botkit"
         clone.mkdir()
         shutil.copy2(BOTKIT, clone / "botkit.py")
+        self.fleet("fleet.json", {"inbox-bot": "inbox-bot: triage"})
         r = self.profile(script=clone / "botkit.py")
         self.assertEqual((r.returncode, r.stderr), (0, b""))
         self.fleet("fleet.json", {"feed-bot": "feed-bot: feeds"})
@@ -226,9 +227,30 @@ class FleetTest(unittest.TestCase):
         r = self.profile(script=clone / "botkit.py", env={"BOTKIT_FLEET": str(self.dir / "nope.json")})
         self.assertEqual(r.returncode, 2)
 
+    def test_bad_default_fleet_is_skipped_with_warning(self):
+        clone = self.dir / "botkit"
+        clone.mkdir()
+        shutil.copy2(BOTKIT, clone / "botkit.py")
+        default = self.dir / "fleet.json"
+        for setup, needle in ((lambda: None, "not found"),
+                              (lambda: default.write_text("{not json"), "invalid JSON"),
+                              (lambda: self.fleet("fleet.json", {"inbox-bot": 3}), "fleet line for"),
+                              (lambda: (default.unlink(), default.mkdir()), "is a directory")):
+            setup()
+            with self.subTest(needle):
+                r = self.profile(script=clone / "botkit.py")
+                self.assertEqual(r.returncode, 0, r.stderr.decode())
+                self.assertEqual(r.stdout, (EXAMPLES / "profiles" / "inbox-bot.md").read_bytes())
+                err = r.stderr.decode()
+                self.assertTrue(err.startswith("botkit: warning: "), err)
+                self.assertIn(needle, err)
+                self.assertIn("fleet check skipped", err)
+
     def test_bad_fleet_files(self):
         cases = [
             (["--fleet", self.dir / "missing.json"], None, "not found"),
+            (["--fleet", self.dir], None, "is a directory"),
+            ([], {"BOTKIT_FLEET": str(self.dir)}, "is a directory"),
             ([], {"BOTKIT_FLEET": str(self.dir / "missing.json")}, "not found"),
             (["--fleet", self.fleet("list.json", ["inbox-bot"])], None, "JSON object"),
             (["--fleet", self.fleet("num.json", {"inbox-bot": 3})], None, "fleet line for 'inbox-bot'"),
@@ -610,10 +632,12 @@ class DocsTest(unittest.TestCase):
                 self.assertIn("scripts/run_safety_cases.py", text)
                 self.assertIn("ROOT/safety/tests/", text)
                 self.assertIn("python3 -m unittest discover -s ROOT/safety/tests", text)
-        for name in ("AGENTS.md", "skills/bot-safety-check/SKILL.md", "skills/evaluate-a-grok-bot/SKILL.md",
-                     "skills/design-a-grok-bot/SKILL.md"):
+        for name in ("AGENTS.md", "skills/evaluate-a-grok-bot/SKILL.md", "skills/design-a-grok-bot/SKILL.md"):
             with self.subTest(name, rule="past mistake"):
                 self.assertIn("in whichever form", texts[name])
+        safety = texts["skills/bot-safety-check/SKILL.md"].strip().splitlines()
+        self.assertLessEqual(len(safety), 2)
+        self.assertIn('"Safety check programs" in `ROOT/botkit/AGENTS.md`', safety[-1])
 
     def test_handover_skipped_when_skills_are_shared(self):
         agents = read("AGENTS.md")

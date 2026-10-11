@@ -77,7 +77,7 @@ Profile fields: `purpose`, `responsibilities` and `voice` are required; `boundar
 
 ### Fleet file
 
-`profile` also checks your fleet file, a JSON object of `"<key>": "<name>: <purpose in one line>"` lines. Its path is `--fleet PATH`, else the `BOTKIT_FLEET` environment variable, else `ROOT/fleet.json` (the folder holding the botkit clone). A missing default file is skipped; a `--fleet` or `BOTKIT_FLEET` path that doesn't exist, or a non-string line, is an error. With `--json bots/<name>.json`, a fleet file with no `<name>` line prints a warning and still exits 0:
+`profile` also checks your fleet file, a JSON object of `"<key>": "<name>: <purpose in one line>"` lines. Its path is `--fleet PATH`, else the `BOTKIT_FLEET` environment variable, else `ROOT/fleet.json` (the folder holding the botkit clone). A `--fleet` or `BOTKIT_FLEET` path that is missing, a directory, not a JSON object or has a non-string line is an error; the same problem with the default file (as in a dev clone) prints a warning and skips the check. With `--json bots/<name>.json`, a fleet file with no `<name>` line prints a warning and still exits 0:
 
 ```sh
 BOTKIT_FLEET=shared/fleet.json python3 botkit/botkit.py profile --json bots/<name>.json -o bots/<name>.md
