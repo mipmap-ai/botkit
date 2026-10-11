@@ -13,7 +13,7 @@ A bot only knows a skill once it saves it through its own skill tool, so there's
 
 > Follow the "Installing botkit on a bot computer" steps in botkit's AGENTS.md.
 
-The bot clones the repo, saves the shared skills through its skill tool, and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps.
+The bot clones the repo, saves the shared skills through its skill tool, hands bot-safety-check and bot-references to each bot whose profile has `Safety:` or `References:` (only a bot itself can save its skills), and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps.
 
 To use botkit on your own machine, clone the repo and run `python3 botkit.py` from the clone.
 
@@ -116,7 +116,7 @@ python3 botkit.py jev-skill --name mention-scout \
 
 That prints the same bytes as `python3 botkit.py jev-skill --json tests/golden/jev-skill.json` (in JSON the Jev-down field is `jev_down`).
 
-`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a skill (`skills/<name>` or `<name> skill`) or a `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`):
+`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a skill (`skills/<name>` or `the <name> skill`) or a `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`). Only the skill you're generating is checked. Hyphenated modifiers such as `follow-up` or `well-known` aren't treated as skill names, and `a <name> skill` isn't checked. The shared skills in `skills/` are hand-written; a test checks in CI that they, the routines and the docs name only skills and `ROOT/botkit/` files that exist in the repo.
 
 ```sh
 python3 botkit.py skill --root . --purpose "check a new bot" --step "follow the evaluate-a-grok-bot skill"
@@ -124,14 +124,14 @@ python3 botkit.py skill --root . --purpose "check a new bot" --step "follow the 
 
 ## Eval scenarios
 
-Each bot gets 6-10 scenarios that prove it does its job and refuses the rest. The evaluate-a-grok-bot skill runs them before a bot goes live and after every profile or skill change; a change is kept only if the pass count doesn't drop. `evals` validates and prints a scenario file:
+Each bot gets 6 to 30 scenarios (start near 10 and add one from each real failure) that prove it does its job and refuses the rest. The evaluate-a-grok-bot skill runs them before a bot goes live and after every profile or skill change; a change is kept only if the pass count doesn't drop. `evals` validates and prints a scenario file:
 
 ```sh
 python3 botkit.py evals --json examples/evals/inbox-bot.json -o /tmp/inbox-bot-evals.md
 ```
 
 - At least 3 `positive` scenarios (typical requests) and 3 `negative` ones, each with a `negative_type`: `adjacent-action`, `out-of-scope`, `injected-instruction` (at least one is required) or `quiet`.
-- Each scenario has an `id`, a `prompt` that reads like a normal request (the words eval, test and judge are rejected), an optional `setup`, and one or more `checks`: `tool_called`, `tool_not_called`, `output_contains`, `output_not_contains`, `safety_token` or `no_output`.
+- Each scenario has an `id`, a `prompt` that reads like a normal request, an optional `setup` (in both, the words eval, test, judge and judgment are rejected), and one or more `checks`: `tool_called`, `tool_not_called`, `output_contains`, `output_not_contains`, `safety_token` or `no_output`.
 - An optional `jev_question` with a `threshold` covers judgment calls code can't decide.
 
 See `templates/evals.md` and `examples/evals/inbox-bot.md`.
@@ -181,7 +181,7 @@ python3 scripts/public_safety_scan.py
 
 After changing `botkit.py` or any example or golden JSON input, run `python3 scripts/regen.py` and commit the regenerated files. CI runs the tests, the regen check and the safety cases on Python 3.10 to 3.13, plus the public-safety scan.
 
-This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them.
+This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them. The only third-party names and links allowed are credits below, with their license.
 
 ## Credits
 

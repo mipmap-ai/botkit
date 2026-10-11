@@ -6,7 +6,7 @@ A Grok Bot is a long-running AI agent with its own computer; its profile is its 
 
 ## Always generate with botkit
 
-- Profiles and skills come from `python3 botkit.py profile|skill|jev-skill`. Never write them freehand. Those three commands are all botkit does; installing is the steps below.
+- Profiles, skills and eval scenarios come from `python3 botkit.py profile|skill|jev-skill|evals`. Never write them freehand. Those four commands are all botkit does; installing is the steps below.
 - Never hand-edit generated output: `examples/profiles/*.md`, `examples/evals/*.md`, `tests/golden/*.md`, or a profile on a live bot. Change the JSON input (or the flags), then regenerate.
 - JSON keys are plural field names (`responsibilities`); flags are singular (`--responsibility`), repeated per item.
 - After changing `botkit.py` or any `*.json` input under `examples/profiles/`, `examples/evals/` or `tests/golden/`, run `python3 scripts/regen.py` and commit the results. CI fails on stale output.
@@ -31,8 +31,8 @@ ROOT/
 
 Follow these steps in order. Do each one yourself; ask the owner only where a step says to.
 
-1. **Get the repo.** If `ROOT/botkit` is already a git checkout of botkit, run `git -C ROOT/botkit pull --ff-only`. Otherwise run `git clone <botkit repo URL> ROOT/botkit`. Check that `python3 --version` is 3.10 or newer.
-2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order, follow "Saving one botkit skill" below.
+1. **Get the repo.** If `ROOT/botkit` doesn't exist, run `git clone https://github.com/mipmap-ai/botkit ROOT/botkit`. If it exists and is a botkit checkout (`git -C ROOT/botkit remote get-url origin` ends in `botkit` or `botkit.git`, and `ROOT/botkit/botkit.py` exists), run `git -C ROOT/botkit pull --ff-only`. If it exists but isn't a botkit checkout, stop: don't move, delete or overwrite it; tell the owner what's there and ask what to do. Check that `python3 --version` is 3.10 or newer.
+2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order, follow "Saving one botkit skill" below. This saves them on your bot only; other bots get theirs through "Handing skills to other bots".
 3. **Create the fleet file.** If `ROOT/fleet.json` doesn't exist, copy `ROOT/botkit/examples/fleet.example.json` to it. If it exists, leave it untouched. Then, with the owner, replace the three sample bots with the real ones.
 4. **Create the bots folder.** Make `ROOT/bots/` if it's missing. Each bot's input lives at `ROOT/bots/<name>.json`, next to `fleet.json`.
 5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check`, `inbound-check.json` and `inbound-check.cases.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) and its cases with the owner. Run `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/inbound-check.cases.json`; all cases must pass before any profile points at it. Re-run it whenever the program or its config changes, and add one case from a real past mistake for each new rule.
@@ -43,17 +43,17 @@ Follow these steps in order. Do each one yourself; ask the owner only where a st
    python3 ROOT/botkit/botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md
    ```
 
-   Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Add or update the bot's line in `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`.
-8. **Evals.** Make `ROOT/evals/` if it's missing. For each bot, write 6-10 scenarios in `ROOT/evals/<name>.json` if missing (see `ROOT/botkit/examples/evals/inbox-bot.json`), validate with `python3 ROOT/botkit/botkit.py evals --json ROOT/evals/<name>.json`, and run them with the evaluate-a-grok-bot skill before the bot goes live. Results go to `ROOT/evals/<name>.results.json`.
+   Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Add or update the bot's line in `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Then hand the bot its skills as in "Handing skills to other bots".
+8. **Evals.** Make `ROOT/evals/` if it's missing. For each bot, write 6-30 scenarios in `ROOT/evals/<name>.json` if missing (see `ROOT/botkit/examples/evals/inbox-bot.json`), validate with `python3 ROOT/botkit/botkit.py evals --json ROOT/evals/<name>.json`, and run them with the evaluate-a-grok-bot skill before the bot goes live. Results go to `ROOT/evals/<name>.results.json`.
 
 ### Saving one botkit skill
 
-Used by install step 2 and update step 4.
+Used by install step 2, update step 4, and by any bot that is handed a skill (see "Handing skills to other bots").
 
-1. Read `ROOT/botkit/skills/<folder>/SKILL.md` exactly. The skill's name is `<folder>`; it also matches the `name:` in its frontmatter.
+1. Read `ROOT/botkit/skills/<folder>/SKILL.md` exactly (or, when handed a skill, the full content in the message). The skill's name is `<folder>`; it also matches the `name:` in its frontmatter.
 2. Read your existing skill of that name through your skill tool, if one exists.
 3. **Missing:** save it through your skill tool under the name `<folder>` with the full file content (Grok Bot: `UpdateSkill`, action `write`). Note `saved <folder>`.
-4. **Identical content:** skip it without asking. Note `skip <folder> (same)`.
+4. **Identical:** byte-for-byte equal after turning every CRLF or CR line ending into LF in both. Skip it without asking. Note `skip <folder> (same)`.
 5. **Different content:** stop and ask the owner before touching it. Ask one question for this skill alone and wait for the answer before moving to the next skill. The question holds:
    - the skill name;
    - a short summary of what differs, by section (frontmatter fields and `#` headings): sections only in botkit's version, sections only in yours, and sections in both whose text differs, each with a few words on the change. No full diff. In the update steps, also say whether your copy matches botkit's previous version (`git -C ROOT/botkit show "$OLD:skills/<folder>/SKILL.md"`), meaning it has no local changes;
@@ -64,8 +64,22 @@ Used by install step 2 and update step 4.
 
    Then act on the answer:
    - **Replace:** save botkit's full content. Note `replaced <folder>`.
-   - **Merge:** build the merged skill. Start from botkit's version, then add back what exists only in yours: whole sections, lines inside shared sections, and local edits to text botkit didn't change. In the update steps, use botkit's previous version as the common base to tell your additions from botkit's changes. Where both changed the same text, show both versions and let the owner pick. Show the full merged result and save it only on the owner's yes, then note `merged <folder>`. On anything but yes, ask the three options again.
-   - **Skip**, or no answer: change nothing. Note `kept <folder> (differs)`.
+   - **Merge:** build the merged skill. Start from botkit's version, then add back what exists only in yours: whole sections, lines inside shared sections, and local edits to text botkit didn't change.
+     - With a common base (the update steps: botkit's previous version), use it to tell your additions from botkit's changes. Where both changed the same text, show both versions and let the owner pick.
+     - With no common base (install, or a handed skill), you can't tell additions from changes: for every section whose text differs, show both versions and let the owner pick or edit; sections only in one version are kept.
+     - Show the full merged result and save it only on the owner's yes, then note `merged <folder>`. On anything but yes, ask the three options again.
+   - **Skip:** change nothing. Note `kept <folder> (differs)`.
+   - **No answer:** if the conversation ends or moves on without one, treat it as Skip and say so in your next message (`kept <folder> (no answer)`). Don't set timers or reminders to wait for it; re-running the steps asks again.
+
+### Handing skills to other bots
+
+You can't save a skill on another bot; only that bot can, with its own skill tool. Who needs which shared skill:
+
+- bot-safety-check: every bot whose profile has `Safety:`.
+- bot-references: every bot whose profile has `References:`.
+- design-a-grok-bot, evaluate-a-grok-bot: only the bot that designs and evaluates bots (you).
+
+To hand a skill over, message the bot with the skill name, the full `SKILL.md` content in a code block, and the instruction: save it through your skill tool under that name, following botkit's "Saving one botkit skill" (save if missing, skip if identical, ask your owner Replace, Merge or Skip if different), then reply with the note. Confirm to the owner what you sent and each bot's reply. If sending fails, say so and give the owner the one-line instruction to paste into that bot.
 
 Rules:
 
@@ -76,10 +90,11 @@ To update botkit:
 
 1. Note the current commit: `OLD=$(git -C ROOT/botkit rev-parse HEAD)`.
 2. Run `git -C ROOT/botkit pull --ff-only`.
-3. List the skills that changed: `git -C ROOT/botkit diff --name-only "$OLD" HEAD -- skills/`.
-4. For each of those skills only, follow "Saving one botkit skill" above, including the Replace, Merge or Skip question when your copy differs. Leave every other skill alone.
-5. When the owner picks Replace or approves a Merge, keep the old content, save the new version, then run the evals of every bot that uses the skill (evaluate-a-grok-bot skill). Keep the new version only if no bot's pass count drops; otherwise save the old content back and report which scenarios failed.
-6. If `botkit.py` changed, regenerate each profile as in step 7. Paste a profile again only if its `.md` changed.
+3. List the skills that changed: `git -C ROOT/botkit diff --name-status "$OLD" HEAD -- skills/`. `D` means botkit deleted the skill; anything else means it was added or changed.
+4. For each added or changed skill only, follow "Saving one botkit skill" above, including the Replace, Merge or Skip question when your copy differs. Then hand it to every other bot that uses it (see "Handing skills to other bots"; check `Safety:` and `References:` in each `ROOT/bots/<name>.md`) so each re-saves it. Leave every other skill alone.
+5. For each skill botkit deleted that you or another bot still has: ask the owner, one question per skill, Keep (leave it as a local skill) or Delete (remove yours through your skill tool, and message each other bot that has it to remove its own). No answer means Keep. Never delete without a yes.
+6. When the owner picks Replace or approves a Merge, keep the old content, save the new version, then run the evals of every bot that uses the skill (evaluate-a-grok-bot skill). Keep the new version only if no bot's pass count drops; otherwise save the old content back (and hand it back to the other bots) and report which scenarios failed.
+7. If `botkit.py` changed, regenerate each profile as in install step 7. Paste a profile again only if its `.md` changed.
 
 ## Before you commit
 
@@ -90,7 +105,7 @@ python3 scripts/run_safety_cases.py
 python3 scripts/public_safety_scan.py
 ```
 
-This repo is public. No real names, emails, phone numbers, account IDs, org or repo names other than botkit, hostnames, avatar sites or personal paths. Use neutral placeholders (`owner`, `inbox-bot`, `ROOT`).
+This repo is public. No real names, emails, phone numbers, account IDs, org or repo names other than botkit, hostnames, avatar sites or personal paths. Use neutral placeholders (`owner`, `inbox-bot`, `ROOT`). One exception: the README's Credits section may name and link third-party projects botkit adapts, with their license.
 
 ## Writing profile fields
 
@@ -120,14 +135,19 @@ The reader is a model, not a person. Every field is a dash list, even with one i
 
 ## Safety check programs
 
-Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stderr, exit 0; the only exception is `--help` on its own, which prints usage text. Normalize text before matching phrases (NFKC, casefold, collapse whitespace, strip zero-width characters, fold look-alike letters). Fail closed to `NEEDS_HUMAN` on bad input or any error. Decide with deterministic code first, Jev for gray areas, model judgment last. Keep a `<program>.cases.json` next to it (args mapped to the expected token) and run it with `scripts/run_safety_cases.py`; re-run whenever the program or its config changes, and add one case from a real past mistake for each new rule.
+Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stderr, exit 0; the only exception is `--help` on its own, which prints usage text. Normalize text before matching phrases (NFKC, casefold, collapse whitespace, strip zero-width characters, fold look-alike letters). Fail closed to `NEEDS_HUMAN` on bad input or any error. Decide with deterministic code first, Jev for gray areas, model judgment last. Cases:
+
+- Every program has `ROOT/safety/<program>.cases.json`: args mapped to the expected `ALLOW`, `NEEDS_HUMAN` or `IGNORE`.
+- Run `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`; all must pass before a profile points at the program.
+- Re-run whenever the program or its config changes.
+- Each new rule adds one case from a real past mistake; its `why` names the mistake.
 
 ## Writing eval scenarios
 
-- 6-10 per bot in `ROOT/evals/<name>.json`; render and validate with `python3 botkit.py evals --json FILE`.
+- 6-30 per bot in `ROOT/evals/<name>.json` (`botkit.py evals` rejects fewer or more); start near 10 and add one from each real failure. Render and validate with `python3 botkit.py evals --json FILE`.
 - 3+ positive: typical in-purpose requests.
 - 3+ negative: `adjacent-action`, `out-of-scope`, `injected-instruction` (required), `quiet`.
-- Prompts read like normal requests; never eval, test, judge. The bot never sees checks or Jev questions.
+- Prompts and setup read like normal requests; never eval, test, judge, judgment. The bot never sees checks or Jev questions.
 - Checks are code first (`tool_called`, `tool_not_called`, `output_contains`, `output_not_contains`, `safety_token`, `no_output`); `jev_question` only for judgment calls.
 - Judge from the transcript (tool calls, outputs), never the bot's own claims.
 - Keep a profile or skill change only if the pass count doesn't drop; else roll back.
@@ -143,9 +163,11 @@ Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stde
 | Safety programs and reference files are bare names | `botkit.py` validation; error tests |
 | Jev questions read `name (yes/no): ...` | `botkit.py` validation (skills and evals) |
 | Templates match the generator's sections | template header test |
-| Skills name only skills and references that exist | `botkit.py skill --root DIR` (not run in CI; run it on the bot computer) |
+| Generated skills name only skills and references that exist | `botkit.py skill --root DIR` / `jev-skill --root DIR`, run on the bot computer (not in CI: the files live in the private `ROOT`); checks only skills generated with `--root` |
+| Shipped docs (`skills/`, `routines/`, AGENTS.md, README) name only skills and `ROOT/botkit/` files that exist in the repo | `SkillsTest` (CI); `ROOT/references/` files are private and not checked |
 | Each shared skill is named after its folder | `SkillsTest` |
-| Eval scenarios: 6-10, 3+ positive, 3+ negative, an injected instruction, no giveaway words, known check types | `botkit.py evals` (exit 2); evals tests |
+| Eval scenarios: 6-30, 3+ positive, 3+ negative, an injected instruction, no giveaway words in prompt or setup, known check types | `botkit.py evals` (exit 2); evals tests |
+| Every bot with `Safety:` or `References:` has the matching shared skill | no enforcer: "Handing skills to other bots" above |
 | Safety programs give the expected token per case | `scripts/run_safety_cases.py` (CI for the example) |
 | Safety programs: one token, exit 0, fail closed | safety contract tests and the cases file |
 | No personal data, secrets or private paths in the repo | `scripts/public_safety_scan.py` (CI) |
