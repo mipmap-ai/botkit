@@ -11,7 +11,7 @@ References:
 - style-guide.md
 ```
 
-`ROOT` is the bot computer's workspace root.
+`ROOT` is the bot computer's private workspace folder.
 
 1. Read `ROOT/references/INDEX.md` once and find the line for each listed file. It says what the file is and when to read it.
 2. Open `ROOT/references/<file>` only when the task matches that description. Don't preload every file.

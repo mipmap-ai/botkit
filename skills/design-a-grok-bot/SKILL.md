@@ -11,11 +11,11 @@ description: >-
 
 Create the bot. Don't produce a shareable template unless asked for one.
 
-Paths below are relative to the bot computer's workspace root (`ROOT`, set by `botkit.py init --root`).
+`ROOT` is the bot computer's private workspace folder, laid out as in botkit's AGENTS.md install steps: the botkit clone at `ROOT/botkit`, private data (`fleet.json`, `bots/`, `safety/`, `references/`) beside it, never inside the clone.
 
 ## Profile format
 
-Every bot's description is these labeled fields, in this order, as plain text (not JSON). Keep the fields in `ROOT/bots/<name>.json` and generate the profile with `python3 botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md`; never write or edit the profile by hand.
+Every bot's description is these labeled fields, in this order, as plain text (not JSON). Keep the fields in `ROOT/bots/<name>.json` and generate the profile with `python3 ROOT/botkit/botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md`; never write or edit the profile by hand. The `.md` is the only text that goes into the bot.
 
 ```
 Purpose:
@@ -96,11 +96,11 @@ Bots may share a program; strictness fits the bot. It prints exactly one of `ALL
 2. Jev for gray areas code can't decide: shell out to the shared `jev` command or import the shared `jev` module. Never call the model API directly.
 3. Model judgment only as a last resort.
 
-Test it with a few allow, needs-human and ignore cases before pointing a profile at it. `examples/safety/inbound-check` in botkit is a starting point.
+Test it with a few allow, needs-human and ignore cases before pointing a profile at it. `ROOT/botkit/examples/safety/inbound-check` is a starting point; copy it into `ROOT/safety/` rather than running it from the clone.
 
 ## Skill format
 
-Generate skills with `python3 botkit.py skill` (or `jev-skill`). Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Only the sections that apply:
+Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it saves it through its own skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content); a file on disk does nothing. Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Only the sections that apply:
 
 ```
 Purpose:
@@ -149,4 +149,4 @@ Same tightness. Purpose names the only job. Responsibilities give the concrete h
 
 1. Read the live profile back. Tell the owner the name and the Purpose lines.
 2. Add the bot to `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When a bot's purpose changes, update its line too.
-3. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `routines/` in botkit has copyable prompts.
+3. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.
