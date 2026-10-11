@@ -24,6 +24,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Generated files are current
         run: python scripts/regen.py --check
+      - name: Safety check cases
+        run: python scripts/run_safety_cases.py
 
   public-safety:
     runs-on: ubuntu-latest
