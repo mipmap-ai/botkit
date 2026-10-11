@@ -105,7 +105,7 @@ class GenerateTest(unittest.TestCase):
         }
         for kind, case in full.items():
             with self.subTest(kind):
-                template = (ROOT / "templates" / f"{kind}.txt").read_text(encoding="utf-8")
+                template = (ROOT / "templates" / f"{kind}.md").read_text(encoding="utf-8")
                 golden = (GOLDEN / f"{case}.md").read_text(encoding="utf-8")
                 self.assertEqual(headers(template), headers(golden))
 
@@ -257,6 +257,10 @@ class InitTest(unittest.TestCase):
             self.assertTrue(os.access(check, os.X_OK))
         self.assertTrue((self.root / "safety" / "inbound-check.json").is_file())
         self.assertTrue((self.root / "references" / "INDEX.md").is_file())
+        bots = self.root / "bots"
+        self.assertTrue(bots.is_dir())
+        self.assertEqual(list(bots.iterdir()), [])
+        self.assertIn(f"create {bots}\n", out)
         self.assertNotIn("skip ", out)
         self.assertIn("Next steps:", out)
 
@@ -272,6 +276,7 @@ class InitTest(unittest.TestCase):
             self.root / "safety" / "inbound-check.json": b'{"allow": ["me"]}\n',
             self.root / ".cursor" / "skills" / "bot-references" / "SKILL.md": b"my edits\n",
             self.root / "references" / "INDEX.md": b"my index\n",
+            self.root / "bots" / "mine.json": b'{"purpose": "keep me"}\n',
         }
         for path, data in seeded.items():
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -280,7 +285,10 @@ class InitTest(unittest.TestCase):
         out = self.init()
         for path, data in seeded.items():
             self.assertEqual(path.read_bytes(), data)
-            self.assertIn(f"skip {path} (exists)\n", out)
+            if path.parent.name != "bots":
+                self.assertIn(f"skip {path} (exists)\n", out)
+        self.assertIn(f"skip {self.root / 'bots'} (exists)\n", out)
+        self.assertEqual([p.name for p in (self.root / "bots").iterdir()], ["mine.json"])
         self.assertTrue((self.root / "safety" / "inbound-check").is_file())
 
         before = snapshot(self.root)
@@ -290,10 +298,16 @@ class InitTest(unittest.TestCase):
         self.assertTrue(actions)
         self.assertTrue(all(l.startswith("skip ") and l.endswith(" (exists)") for l in actions))
 
+    def test_bots_path_taken_by_a_file_is_left_alone(self):
+        (self.root / "bots").write_bytes(b"not a folder\n")
+        out = self.init()
+        self.assertIn(f"skip {self.root / 'bots'} (exists)\n", out)
+        self.assertEqual((self.root / "bots").read_bytes(), b"not a folder\n")
+
     def test_existing_symlink_is_not_followed(self):
         if not hasattr(os, "symlink"):
             self.skipTest("no symlinks")
-        target = self.root / "outside.txt"
+        target = self.root / "outside-target"
         target.write_bytes(b"untouched\n")
         try:
             os.symlink(target, self.root / "fleet.json")

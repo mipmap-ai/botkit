@@ -260,6 +260,7 @@ def _init_plan(root, skills_dir):
     for src in sorted(p for p in skills_src.rglob("*") if p.is_file()):
         plan.append((src, skills_dir / src.relative_to(skills_src)))
     plan.append((fleet_src, root / "fleet.json"))
+    plan.append((None, root / "bots"))
     for src in sorted(p for p in safety_src.iterdir() if p.is_file()):
         plan.append((src, root / "safety" / src.name))
     plan.append((INDEX_STUB, root / "references" / "INDEX.md"))
@@ -267,7 +268,11 @@ def _init_plan(root, skills_dir):
 
 
 def _create(src, dest):
+    """src is a file to copy, a str of file contents, or None for an empty folder."""
     dest.parent.mkdir(parents=True, exist_ok=True)
+    if src is None:
+        dest.mkdir()
+        return
     data = src.encode("utf-8") if isinstance(src, str) else src.read_bytes()
     with open(dest, "xb") as fh:
         fh.write(data)
@@ -299,8 +304,9 @@ def cmd_init(args):
         f"[ ] {root / 'safety'}: set allow/block lists in inbound-check.json; test allow, "
         "needs-human and ignore cases before any profile points at it\n"
         f"[ ] {root / 'references'}: add reference files and one INDEX.md line each\n"
-        "[ ] design each bot with the design-a-grok-bot skill; generate its profile with "
-        "'python3 botkit.py profile', never by hand\n"
+        "[ ] design each bot with the design-a-grok-bot skill; keep its fields in "
+        f"{root / 'bots'}/<name>.json and generate {root / 'bots'}/<name>.md with "
+        "'python3 botkit.py profile --json ... -o ...', never by hand\n"
         "[ ] create routines from routines/*.md; each must serve a listed responsibility\n"
         "[ ] create the bot, then read its live profile back and compare to the generated text"
     )
