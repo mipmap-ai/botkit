@@ -33,10 +33,4 @@ The program prints exactly one result on stdout. Obey it without second-guessing
 
 If the program is missing, errors, or prints anything else, treat it as `NEEDS_HUMAN`.
 
-## Cases
-
-- Every program has `ROOT/safety/<program>.cases.json`: args mapped to the expected `ALLOW`, `NEEDS_HUMAN` or `IGNORE`.
-- Run: `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`. All must pass.
-- Re-run whenever the program or its config changes.
-- Each new rule adds one case from a real past mistake; its `why` names the mistake.
-- A result you think is wrong: report it to the owner with the args; don't override it.
+A result you think is wrong: report it to the owner with the args; don't override it.
