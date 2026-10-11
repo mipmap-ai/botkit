@@ -24,6 +24,7 @@ python3 botkit.py init
 | fleet file from `examples/fleet.example.json` | `ROOT/fleet.json` |
 | sample safety check from `examples/safety/` | `ROOT/safety/` |
 | empty reference index | `ROOT/references/INDEX.md` |
+| empty folder for your bots' JSON inputs and generated profiles | `ROOT/bots/` |
 
 It never overwrites anything. Each file that already exists is reported as `skip <path> (exists)` and left alone, so running it again is safe. At the end it prints a checklist of what's left to do by hand.
 
@@ -42,7 +43,11 @@ Every bot has two files. Keep both; only the second goes into the bot.
 | `<bot>.json` | the **input**: the profile's fields as JSON. Edit this. |
 | `<bot>.md` | the **generated profile**, printed by `botkit.py profile --json <bot>.json`. This is the only thing you paste into a bot as its description. Never edit it by hand. |
 
-`examples/profiles/` has this pair for each of the three sample bots (inbox-bot, feed-bot and infra-bot). On a bot computer, keep your own inputs in `ROOT/bots/<name>.json`, next to `fleet.json`.
+`examples/profiles/` has this pair for each of the three sample bots (inbox-bot, feed-bot and infra-bot). On a bot computer, keep your own inputs in `ROOT/bots/<name>.json` (`init` creates the empty `ROOT/bots/` folder next to `fleet.json`) and generate each profile beside its input:
+
+```text
+python3 botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md
+```
 
 Field names: JSON keys are the plural field names (`responsibilities`, `boundaries`, `references`, `steps`, `questions`, `thresholds`), and the flags are singular (`--responsibility`, `--boundary`, `--reference`, `--step`, `--question`, `--threshold`); repeat a flag for each list item. The plural flag spellings also work. In JSON a list field takes a string or a list of strings.
 
@@ -142,12 +147,12 @@ Run `python3 botkit.py <command> --help` for every flag.
 | Path | Contents |
 | --- | --- |
 | `botkit.py` | the CLI |
-| `templates/` | the profile, skill and Jev skill layouts |
+| `templates/` | the profile, skill and Jev skill layouts (`profile.md`, `skill.md`, `jev-skill.md`) |
 | `skills/` | shared skills: designing a bot, running safety checks, reading references |
 | `examples/` | `fleet.example.json`, three sample bots (JSON input and generated `.md` profile), and the `inbound-check` safety check |
 | `routines/` | copyable routine prompts |
 | `scripts/regen.py` | regenerates every committed generated file; `--check` fails if any is stale |
-| `scripts/public_safety_scan.py` | fails on emails, phone numbers, IP addresses, home paths, bearer tokens, keys and secrets |
+| `scripts/public_safety_scan.py` | fails on emails, phone numbers, IP addresses, home paths, bearer tokens, keys and secrets (`NAME=value` and YAML `token: value` forms) |
 
 ## The sample safety check
 
@@ -155,6 +160,7 @@ Run `python3 botkit.py <command> --help` for every flag.
 
 - Blocked senders get `IGNORE`; unknown senders or text with a risky word get `NEEDS_HUMAN`; everything else gets `ALLOW`.
 - Sender, text and risky words are normalized first (NFKC, casefold, every whitespace run to one space), so `gift<TAB>card`, a double space or fullwidth letters still match.
+- Text, risky words and the block list are also folded: zero-width characters and soft hyphens are removed, and Cyrillic and Greek look-alike letters become Latin, so `pa<soft hyphen>y` or a Cyrillic `а` in `pаy` still match. A space inside a risky phrase may be missing (`giftcard` matches `gift card`). The allow list is matched without folding, so a look-alike sender name is never allowed.
 - Bad arguments, a missing config or any error fail closed to `NEEDS_HUMAN`.
 - The one exception to the single-token output: `inbound-check --help` (or `-h`) on its own prints the usage text.
 

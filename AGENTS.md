@@ -9,15 +9,15 @@ A Grok Bot is a long-running AI agent with its own computer; its profile is its 
 - Profiles and skills come from `python3 botkit.py profile|skill|jev-skill`. Never write them freehand.
 - Never hand-edit generated output: `examples/profiles/*.md`, `tests/golden/*.md`, or a profile on a live bot. Change the JSON input (or the flags), then regenerate.
 - JSON keys are plural field names (`responsibilities`); flags are singular (`--responsibility`), repeated per item.
+- After changing `botkit.py` or any `*.json` input under `examples/profiles/` or `tests/golden/`, run `python3 scripts/regen.py` and commit the results. CI fails on stale output.
+- Keep `templates/*.md` in step with `botkit.py`; a test compares their section headers.
+- Hand-written files: `botkit.py`, `templates/`, `skills/`, `routines/`, `examples/safety/`, docs, tests.
 
 ## Adding a bot on a bot computer
 
 - Follow the design-a-grok-bot skill (`skills/design-a-grok-bot/SKILL.md`; installed to `ROOT/.cursor/skills/`) for intake, Purpose, Boundaries and the safety check.
-- Keep the bot's input in `ROOT/bots/<name>.json`, next to `ROOT/fleet.json`. Generate with `python3 botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md`; the `.md` is the only text that goes into the bot.
+- Keep the bot's input in `ROOT/bots/<name>.json` (`init` creates the empty `ROOT/bots/` folder next to `ROOT/fleet.json`). Generate with `python3 botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md`; the `.md` is the only text that goes into the bot.
 - Add the bot to `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Update the line whenever Purpose changes.
-- After changing `botkit.py` or any `*.json` input under `examples/profiles/` or `tests/golden/`, run `python3 scripts/regen.py` and commit the results. CI fails on stale output.
-- Keep `templates/` in step with `botkit.py`; a test compares their section headers.
-- Hand-written files: `botkit.py`, `skills/`, `routines/`, `examples/safety/`, docs, tests.
 
 ## Before you commit
 
