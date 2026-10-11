@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""botkit: generate Grok Bot profiles and skills, and set up a bot computer.
+"""botkit: generate Grok Bot profiles and skills.
 
 Stdlib only. Output is deterministic: fixed section order, items in input
 order, LF line endings, one trailing newline.
@@ -7,17 +7,10 @@ order, LF line endings, one trailing newline.
 
 import argparse
 import json
-import os
 import re
-import shutil
 import sys
-from pathlib import Path
 
 __version__ = "0.1.0"
-
-HERE = Path(__file__).resolve().parent
-DEFAULT_ROOT = "/workspace"
-DEFAULT_SKILLS_SUBDIR = os.path.join(".cursor", "skills")
 
 BARE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -242,81 +235,10 @@ def cmd_generate(args):
     return 0
 
 
-INDEX_STUB = (
-    "# Reference index\n"
-    "\n"
-    "One line per file in this folder: `file: what it is / when to read it`.\n"
-)
-
-
-def _init_plan(root, skills_dir):
-    skills_src = HERE / "skills"
-    fleet_src = HERE / "examples" / "fleet.example.json"
-    safety_src = HERE / "examples" / "safety"
-    for p in (skills_src, fleet_src, safety_src):
-        if not p.exists():
-            raise BotkitError(f"missing {p}; run init from a full botkit checkout")
-    plan = []
-    for src in sorted(p for p in skills_src.rglob("*") if p.is_file()):
-        plan.append((src, skills_dir / src.relative_to(skills_src)))
-    plan.append((fleet_src, root / "fleet.json"))
-    plan.append((None, root / "bots"))
-    for src in sorted(p for p in safety_src.iterdir() if p.is_file()):
-        plan.append((src, root / "safety" / src.name))
-    plan.append((INDEX_STUB, root / "references" / "INDEX.md"))
-    return plan
-
-
-def _create(src, dest):
-    """src is a file to copy, a str of file contents, or None for an empty folder."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if src is None:
-        dest.mkdir()
-        return
-    data = src.encode("utf-8") if isinstance(src, str) else src.read_bytes()
-    with open(dest, "xb") as fh:
-        fh.write(data)
-    if not isinstance(src, str):
-        shutil.copymode(src, dest)
-
-
-def cmd_init(args):
-    root = Path(args.root)
-    if not root.is_dir():
-        raise BotkitError(f"root {root} is not a directory; create it or pass --root DIR")
-    skills_dir = Path(args.skills_dir) if args.skills_dir else root / DEFAULT_SKILLS_SUBDIR
-    for src, dest in _init_plan(root, skills_dir):
-        if os.path.lexists(dest):
-            print(f"skip {dest} (exists)")
-            continue
-        try:
-            _create(src, dest)
-        except FileExistsError:
-            print(f"skip {dest} (exists)")
-            continue
-        except OSError as e:
-            raise BotkitError(f"cannot write {dest}: {e.strerror or e}")
-        print(f"create {dest}")
-    print(
-        "\nNext steps:\n"
-        f"[ ] {root / 'fleet.json'}: replace the sample bots with yours, one line each "
-        "('<name>': '<name>: <purpose in one line>')\n"
-        f"[ ] {root / 'safety'}: set allow/block lists in inbound-check.json; test allow, "
-        "needs-human and ignore cases before any profile points at it\n"
-        f"[ ] {root / 'references'}: add reference files and one INDEX.md line each\n"
-        "[ ] design each bot with the design-a-grok-bot skill; keep its fields in "
-        f"{root / 'bots'}/<name>.json and generate {root / 'bots'}/<name>.md with "
-        "'python3 botkit.py profile --json ... -o ...', never by hand\n"
-        "[ ] create routines from routines/*.md; each must serve a listed responsibility\n"
-        "[ ] create the bot, then read its live profile back and compare to the generated text"
-    )
-    return 0
-
-
 def build_parser():
     p = argparse.ArgumentParser(
         prog="botkit",
-        description="Generate Grok Bot profiles and skills; set up a bot computer.",
+        description="Generate Grok Bot profiles and skills.",
     )
     p.add_argument("--version", action="version", version=f"botkit {__version__}")
     sub = p.add_subparsers(dest="command", metavar="COMMAND")
@@ -333,16 +255,6 @@ def build_parser():
         for f in spec:
             sp.add_argument(*f.flags, dest=f.key, action="append", metavar="TEXT", help=f.help)
         sp.set_defaults(func=cmd_generate)
-    ip = sub.add_parser(
-        "init", help="set up a bot computer without overwriting anything",
-        description="Copy skills, fleet.json, safety checks and a reference index into a bot "
-                    "computer. Existing files are never overwritten.",
-    )
-    ip.add_argument("--root", default=DEFAULT_ROOT,
-                    help=f"bot computer workspace (default: {DEFAULT_ROOT})")
-    ip.add_argument("--skills-dir", metavar="DIR",
-                    help=f"bot skills folder (default: ROOT/{DEFAULT_SKILLS_SUBDIR.replace(os.sep, '/')})")
-    ip.set_defaults(func=cmd_init)
     return p
 
 

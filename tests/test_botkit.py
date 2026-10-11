@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import stat
 import subprocess
 import sys
 import tempfile
@@ -221,116 +220,28 @@ class ErrorTest(unittest.TestCase):
             self.assertEqual(r.stdout, b"")
 
 
-def snapshot(root):
-    out = {}
-    for p in sorted(Path(root).rglob("*")):
-        st = p.lstat()
-        out[str(p.relative_to(root))] = (
-            stat.S_IFMT(st.st_mode), stat.S_IMODE(st.st_mode),
-            p.read_bytes() if p.is_file() else None,
-        )
-    return out
-
-
-class InitTest(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
-
-    def init(self, *extra):
-        r = botkit("init", "--root", self.root, *extra)
-        self.assertEqual(r.returncode, 0, r.stderr.decode())
-        return r.stdout.decode()
-
-    def test_fresh_install_layout(self):
-        out = self.init()
-        skills = self.root / ".cursor" / "skills"
-        for name in ("design-a-grok-bot", "bot-safety-check", "bot-references"):
-            self.assertEqual((skills / name / "SKILL.md").read_bytes(),
-                             (ROOT / "skills" / name / "SKILL.md").read_bytes())
-        self.assertEqual((self.root / "fleet.json").read_bytes(),
-                         (EXAMPLES / "fleet.example.json").read_bytes())
-        check = self.root / "safety" / "inbound-check"
-        self.assertEqual(check.read_bytes(), (EXAMPLES / "safety" / "inbound-check").read_bytes())
-        if os.name == "posix":
-            self.assertTrue(os.access(check, os.X_OK))
-        self.assertTrue((self.root / "safety" / "inbound-check.json").is_file())
-        self.assertTrue((self.root / "references" / "INDEX.md").is_file())
-        bots = self.root / "bots"
-        self.assertTrue(bots.is_dir())
-        self.assertEqual(list(bots.iterdir()), [])
-        self.assertIn(f"create {bots}\n", out)
-        self.assertNotIn("skip ", out)
-        self.assertIn("Next steps:", out)
-
-    def test_custom_skills_dir(self):
-        skills = self.root / "elsewhere"
-        self.init("--skills-dir", skills)
-        self.assertTrue((skills / "bot-references" / "SKILL.md").is_file())
-        self.assertFalse((self.root / ".cursor").exists())
-
-    def test_never_overwrites(self):
-        seeded = {
-            self.root / "fleet.json": b'{"mine": "mine: keep me"}\n',
-            self.root / "safety" / "inbound-check.json": b'{"allow": ["me"]}\n',
-            self.root / ".cursor" / "skills" / "bot-references" / "SKILL.md": b"my edits\n",
-            self.root / "references" / "INDEX.md": b"my index\n",
-            self.root / "bots" / "mine.json": b'{"purpose": "keep me"}\n',
-        }
-        for path, data in seeded.items():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)
-
-        out = self.init()
-        for path, data in seeded.items():
-            self.assertEqual(path.read_bytes(), data)
-            if path.parent.name != "bots":
-                self.assertIn(f"skip {path} (exists)\n", out)
-        self.assertIn(f"skip {self.root / 'bots'} (exists)\n", out)
-        self.assertEqual([p.name for p in (self.root / "bots").iterdir()], ["mine.json"])
-        self.assertTrue((self.root / "safety" / "inbound-check").is_file())
-
-        before = snapshot(self.root)
-        again = self.init()
-        self.assertEqual(snapshot(self.root), before)
-        actions = [l for l in again.splitlines() if l.startswith(("create ", "skip "))]
-        self.assertTrue(actions)
-        self.assertTrue(all(l.startswith("skip ") and l.endswith(" (exists)") for l in actions))
-
-    def test_bots_path_taken_by_a_file_is_left_alone(self):
-        (self.root / "bots").write_bytes(b"not a folder\n")
-        out = self.init()
-        self.assertIn(f"skip {self.root / 'bots'} (exists)\n", out)
-        self.assertEqual((self.root / "bots").read_bytes(), b"not a folder\n")
-
-    def test_existing_symlink_is_not_followed(self):
-        if not hasattr(os, "symlink"):
-            self.skipTest("no symlinks")
-        target = self.root / "outside-target"
-        target.write_bytes(b"untouched\n")
-        try:
-            os.symlink(target, self.root / "fleet.json")
-        except OSError:
-            self.skipTest("cannot create symlinks")
-        out = self.init()
-        self.assertIn(f"skip {self.root / 'fleet.json'} (exists)", out)
-        self.assertEqual(target.read_bytes(), b"untouched\n")
-
-    @unittest.skipIf(os.name != "posix" or os.geteuid() == 0, "needs a non-root POSIX user")
-    def test_read_only_root_errors_cleanly(self):
-        self.root.chmod(0o555)
-        self.addCleanup(self.root.chmod, 0o755)
-        r = botkit("init", "--root", self.root)
+class CommandsTest(unittest.TestCase):
+    def test_only_generate_commands(self):
+        help_text = botkit("--help").stdout.decode()
+        listed = re.findall(r"(?m)^    (\S+)\s{2,}", help_text)
+        self.assertEqual(listed, ["profile", "skill", "jev-skill"])
+        r = botkit("init")
         self.assertEqual(r.returncode, 2)
-        err = r.stderr.decode()
-        self.assertIn("botkit: error: cannot write", err)
-        self.assertNotIn("Traceback", err)
+        self.assertIn("invalid choice", r.stderr.decode())
 
-    def test_missing_root_errors(self):
-        r = botkit("init", "--root", self.root / "nope")
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("not a directory", r.stderr.decode())
+
+class SkillsTest(unittest.TestCase):
+    def test_each_skill_named_after_its_folder(self):
+        skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
+        self.assertEqual([p.parent.name for p in skills],
+                         ["bot-references", "bot-safety-check", "design-a-grok-bot"])
+        for path in skills:
+            with self.subTest(path.parent.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertTrue(text.startswith("---\n"))
+                front = text.split("---\n", 2)[1]
+                self.assertIn(f"name: {path.parent.name}\n", front)
+                self.assertRegex(front, r"(?m)^description: ")
 
 
 if __name__ == "__main__":
