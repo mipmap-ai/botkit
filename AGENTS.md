@@ -15,7 +15,7 @@ A Grok Bot is a long-running AI agent; its profile is its whole persona. All of 
 
 ## Installing botkit on a bot computer
 
-A bot doesn't read skills from any folder. It only knows a skill once it is saved through a skill tool; in Grok Bot that's the `UpdateSkill` tool with action `write` and the full `SKILL.md` content. Copying skill files onto the computer does nothing. On Grok Bot, skills are global: one library shared by all of the owner's bots, so a skill saved once is known to every bot. Only a setup where each bot has its own skill store needs skills handed to each bot.
+A bot doesn't read skills from any folder. It only knows a skill once it is saved through a skill tool; in Grok Bot that's the `UpdateSkill` tool with action `write` and the full `SKILL.md` content. Copying skill files onto the computer does nothing. On Grok Bot, skills are global: one library shared by all of the owner's bots, so a skill saved once is known to every bot. Only a setup where each bot has its own skill store needs skills handed to each bot. To tell which you have: on Grok Bot, skills are shared; on anything else, ask the owner.
 
 `ROOT` is the private workspace folder on the bot computer (usually `/workspace`). Every bot in the fleet shares that computer, so there is one `ROOT`: install once, and every bot runs the same `ROOT/safety/` programs and reads the same `ROOT/references/` files. Everything private lives in `ROOT`, outside the clone:
 
@@ -30,7 +30,7 @@ ROOT/
   references/          reference files plus INDEX.md (optional)
 ```
 
-The fleet file is `ROOT/fleet.json` unless `BOTKIT_FLEET` names another path; `botkit.py profile --fleet PATH` overrides both. Below, "the fleet file" means that path. `profile` checks it when it exists (an explicit `--fleet` or `BOTKIT_FLEET` path must exist): every value a string, and a warning if the bot of `--json ROOT/bots/<name>.json` has no `<name>` line.
+The fleet file is `ROOT/fleet.json` unless `BOTKIT_FLEET` names another path; `botkit.py profile --fleet PATH` overrides both. Below, "the fleet file" means that path. `profile` checks it: every value a string, and a warning if the bot of `--json ROOT/bots/<name>.json` has no `<name>` line. A missing, malformed or directory path from `--fleet` or `BOTKIT_FLEET` is an error; the same problem with the default `ROOT/fleet.json` (as in a dev clone) only warns and skips the check.
 
 Follow these steps in order. Do each one yourself; ask the owner only where a step says to.
 
@@ -40,13 +40,13 @@ Follow these steps in order. Do each one yourself; ask the owner only where a st
 4. **Create the bots folder.** Make `ROOT/bots/` if it's missing. Each bot's input lives at `ROOT/bots/<name>.json`.
 5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check`, `inbound-check.json` and `inbound-check.cases.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) and its cases with the owner. Run its safety tests as in "Safety check programs" below; all must pass before any profile points at it.
 6. **References (optional).** Make `ROOT/references/` and an `INDEX.md` there if they're missing; one line per file: `file: what it is / when to read it`.
-7. **Profiles.** For each bot, design it with the design-a-grok-bot skill (saved in step 2) and keep its fields in `ROOT/bots/<name>.json`. Generate its profile:
+7. **Profiles.** For each bot, design it with the design-a-grok-bot skill (saved in step 2) and keep its fields in `ROOT/bots/<name>.json`. Add or update its line in the fleet file first, so generating doesn't warn: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Generate its profile:
 
    ```text
    python3 ROOT/botkit/botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md
    ```
 
-   Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Add or update the bot's line in the fleet file: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Only with per-bot skill stores, hand the bot its skills as in "Handing skills to other bots".
+   Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Only with per-bot skill stores, hand the bot its skills as in "Handing skills to other bots".
 8. **Evals.** Make `ROOT/evals/` if it's missing. For each bot, write 6-30 scenarios in `ROOT/evals/<name>.json` if missing (see `ROOT/botkit/examples/evals/inbox-bot.json`), validate with `python3 ROOT/botkit/botkit.py evals --json ROOT/evals/<name>.json`, and run them with the evaluate-a-grok-bot skill before the bot goes live. Results go to `ROOT/evals/<name>.results.json`.
 
 ### Saving one botkit skill

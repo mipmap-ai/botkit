@@ -37,9 +37,4 @@ A result you think is wrong: report it to the owner with the args; don't overrid
 
 ## Safety tests
 
-Before a profile points at a program, and after any change to it or its config, its tests must all pass, in either form:
-
-- `ROOT/safety/<program>.cases.json`: `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`
-- an existing unittest suite in `ROOT/safety/tests/`: `python3 -m unittest discover -s ROOT/safety/tests`
-
-Each new rule adds one case from a real past mistake, in whichever form the program uses.
+Before a profile points at a program, and after any change to it, its tests must pass: `ROOT/safety/<program>.cases.json` via `python3 ROOT/botkit/scripts/run_safety_cases.py`, or an existing unittest suite in `ROOT/safety/tests/` via `python3 -m unittest discover -s ROOT/safety/tests`. Details: "Safety check programs" in `ROOT/botkit/AGENTS.md`.
