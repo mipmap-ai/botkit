@@ -1,11 +1,11 @@
 # botkit
 
-Versioned public templates for Grok Bot profiles and skills, plus a deterministic CLI that generates them.
+Versioned public templates for Grok Bot profiles, skills and evals, plus a deterministic CLI that generates them.
 
 - A **Grok Bot** is a long-running AI agent with its own computer, chats and scheduled routines; its profile (the description it's created with) is its whole persona, re-read on every wake.
 - **Jev** is a scoring API used for yes/no judgments: a skill sends it fixed questions plus an input and gets a score per question back.
 
-`botkit.py` is one file, Python 3.10+, standard library only. It prints bot profiles and skills in a fixed format: `profile`, `skill` and `jev-skill` are its only commands.
+`botkit.py` is one file, Python 3.10+, standard library only. It prints bot profiles, skills and eval scenarios in a fixed format: `profile`, `skill`, `jev-skill` and `evals` are its only commands.
 
 ## Use it with your bots
 
@@ -116,6 +116,26 @@ python3 botkit.py jev-skill --name mention-scout \
 
 That prints the same bytes as `python3 botkit.py jev-skill --json tests/golden/jev-skill.json` (in JSON the Jev-down field is `jev_down`).
 
+`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a skill (`skills/<name>` or `<name> skill`) or a `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`):
+
+```sh
+python3 botkit.py skill --root . --purpose "check a new bot" --step "follow the evaluate-a-grok-bot skill"
+```
+
+## Eval scenarios
+
+Each bot gets 6-10 scenarios that prove it does its job and refuses the rest. The evaluate-a-grok-bot skill runs them before a bot goes live and after every profile or skill change; a change is kept only if the pass count doesn't drop. `evals` validates and prints a scenario file:
+
+```sh
+python3 botkit.py evals --json examples/evals/inbox-bot.json -o /tmp/inbox-bot-evals.md
+```
+
+- At least 3 `positive` scenarios (typical requests) and 3 `negative` ones, each with a `negative_type`: `adjacent-action`, `out-of-scope`, `injected-instruction` (at least one is required) or `quiet`.
+- Each scenario has an `id`, a `prompt` that reads like a normal request (the words eval, test and judge are rejected), an optional `setup`, and one or more `checks`: `tool_called`, `tool_not_called`, `output_contains`, `output_not_contains`, `safety_token` or `no_output`.
+- An optional `jev_question` with a `threshold` covers judgment calls code can't decide.
+
+See `templates/evals.md` and `examples/evals/inbox-bot.md`.
+
 Run `python3 botkit.py <command> --help` for every flag.
 
 ## Rules the generator enforces
@@ -130,10 +150,11 @@ Run `python3 botkit.py <command> --help` for every flag.
 | Path | Contents |
 | --- | --- |
 | `botkit.py` | the CLI |
-| `templates/` | the profile, skill and Jev skill layouts (`profile.md`, `skill.md`, `jev-skill.md`) |
-| `skills/` | shared skills: designing a bot, running safety checks, reading references |
-| `examples/` | `fleet.example.json`, three sample bots (JSON input and generated `.md` profile), and the `inbound-check` safety check |
+| `templates/` | the profile, skill, Jev skill and evals layouts (`profile.md`, `skill.md`, `jev-skill.md`, `evals.md`) |
+| `skills/` | shared skills: designing a bot, evaluating a bot, running safety checks, reading references |
+| `examples/` | `fleet.example.json`, three sample bots (JSON input and generated `.md` profile), inbox-bot's eval scenarios, and the `inbound-check` safety check with its cases |
 | `routines/` | copyable routine prompts |
+| `scripts/run_safety_cases.py` | runs safety-check cases files |
 | `scripts/regen.py` | regenerates every committed generated file; `--check` fails if any is stale |
 | `scripts/public_safety_scan.py` | fails on emails, phone numbers, IP addresses, home paths, bearer tokens, keys and secrets (`NAME=value` and YAML `token: value` forms) |
 
@@ -147,19 +168,24 @@ Run `python3 botkit.py <command> --help` for every flag.
 - Bad arguments, a missing config or any error fail closed to `NEEDS_HUMAN`.
 - The one exception to the single-token output: `inbound-check --help` (or `-h`) on its own prints the usage text.
 
-Edit `inbound-check.json` next to it for your allow list, block list and risky words. The `ops-check` program named in the infra-bot example isn't included; write your own.
+Edit `inbound-check.json` next to it for your allow list, block list and risky words. `inbound-check.cases.json` maps argument lists to the expected token; `python3 scripts/run_safety_cases.py` runs every `examples/safety/*.cases.json` (or the files you name) and fails on any mismatch. Re-run it whenever the program or its config changes, and add one case from a real past mistake for each new rule. The `ops-check` program named in the infra-bot example isn't included; write your own.
 
 ## Development
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 scripts/regen.py --check
+python3 scripts/run_safety_cases.py
 python3 scripts/public_safety_scan.py
 ```
 
-After changing `botkit.py` or any example or golden JSON input, run `python3 scripts/regen.py` and commit the regenerated files. CI runs the tests on Python 3.10 to 3.13, plus the public-safety scan.
+After changing `botkit.py` or any example or golden JSON input, run `python3 scripts/regen.py` and commit the regenerated files. CI runs the tests, the regen check and the safety cases on Python 3.10 to 3.13, plus the public-safety scan.
 
 This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them.
+
+## Credits
+
+The evals, safety cases and drift loop adapt Cursor's public [pstack plugin](https://github.com/cursor/plugins/tree/main/pstack) (MIT): its eval playbook, the principles "test behavior, not implementation", "prove it works" and "encode lessons in structure", and its `correct` skill (the rule-to-enforcer table and cases from real past mistakes).
 
 ## License
 

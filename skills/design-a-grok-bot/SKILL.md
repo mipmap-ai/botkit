@@ -70,7 +70,7 @@ If there is no delete tool, only create when the job is real.
 - Non-coding bots name the adjacent verb they never do (a mentions scout does not post; a drafter does not send).
 - Add a line only from evidence: the same drift on several days and conversations, never one slip.
 - First ask whether a purpose rewrite fixes it; prefer that to a new line.
-- A line stays only if drift on post-edit conversations beats the purpose-only baseline; otherwise roll back.
+- A line stays only if drift on post-edit conversations beats the purpose-only baseline and the bot's evals don't drop; otherwise roll back.
 - No fixed cap; every line earns its place on new data.
 - Drift on many bots at once likely means a model change; don't edit profiles for it.
 - Action rules (send, delete, buy, paths, numbers) never live in prose. They go in the Safety program.
@@ -96,7 +96,7 @@ Bots may share a program; strictness fits the bot. It prints exactly one of `ALL
 2. Jev for gray areas code can't decide: shell out to the shared `jev` command or import the shared `jev` module. Never call the model API directly.
 3. Model judgment only as a last resort.
 
-Test it with a few allow, needs-human and ignore cases before pointing a profile at it. `ROOT/botkit/examples/safety/inbound-check` is a starting point; copy it into `ROOT/safety/` rather than running it from the clone.
+Keep a cases file next to it, `ROOT/safety/<program>.cases.json` (args mapped to the expected `ALLOW`, `NEEDS_HUMAN` or `IGNORE`), and run `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json` before pointing a profile at it. Re-run it whenever the program or its config changes. For each new rule, add one case from a real past mistake. `ROOT/botkit/examples/safety/inbound-check` and its `inbound-check.cases.json` are a starting point; copy them into `ROOT/safety/` rather than running them from the clone.
 
 ## Skill format
 
@@ -148,5 +148,6 @@ Same tightness. Purpose names the only job. Responsibilities give the concrete h
 ## After create
 
 1. Read the live profile back. Tell the owner the name and the Purpose lines.
-2. Add the bot to `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When a bot's purpose changes, update its line too.
-3. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.
+2. Write 6-10 scenarios in `ROOT/evals/<name>.json` and run them with the evaluate-a-grok-bot skill before the bot goes live; re-run after every profile or skill change.
+3. Add the bot to `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When a bot's purpose changes, update its line too.
+4. If the job needs a standing routine, review its cost first. You can't write another bot's routines: message the new bot with the exact routine name, prompt, and schedule or trigger, and tell it to create the routine. Confirm to the owner that you sent it. If sending fails, say so and give the owner the one-line instruction to paste into that bot. `ROOT/botkit/routines/` has copyable prompts.
