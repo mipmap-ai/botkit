@@ -9,11 +9,11 @@ Versioned public templates for Grok Bot profiles, skills and evals, plus a deter
 
 ## Use it with your bots
 
-A bot only knows a skill once it saves it through its own skill tool, so there's nothing to install by copying files. Instead, tell your bot:
+A bot only knows a skill once it's saved through a skill tool, so there's nothing to install by copying files. Instead, tell your bot:
 
 > Follow the "Installing botkit on a bot computer" steps in botkit's AGENTS.md.
 
-The bot clones the repo, saves the shared skills through its skill tool, hands bot-safety-check and bot-references to each bot whose profile has `Safety:` or `References:` (only a bot itself can save its skills), and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps; there, a copy with no local changes is updated without asking.
+The bot clones the repo, saves the shared skills through its skill tool, and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. On Grok Bot, skills are global (one library shared by all of the owner's bots), so saving once covers every bot. Only where each bot has its own skill store does it also hand bot-safety-check and bot-references to each bot whose profile has `Safety:` or `References:`. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps; there, a copy with no local changes is updated without asking.
 
 To use botkit on your own machine, clone the repo and run `python3 botkit.py` from the clone.
 
@@ -51,13 +51,17 @@ python3 botkit.py profile \
 ```text
 Purpose:
 - keep inbox triaged so nothing important waits
+
 Responsibilities:
 - sort new mail: act, reply, read later, archive
 - draft replies for mail needing an answer
+
 Boundaries:
 - drafts only; never sends
+
 Safety:
 - inbound-check --from {sender} --text {message}
+
 Voice:
 - terse
 - plain words
@@ -69,7 +73,15 @@ From JSON, written to a file with `-o` (any path you choose):
 python3 botkit.py profile --json examples/profiles/inbox-bot.json -o /tmp/inbox-bot.md
 ```
 
-Profile fields: `purpose`, `responsibilities`, `boundaries` and `voice` are required; `safety` and `references` are optional and left out of the output when empty.
+Profile fields: `purpose`, `responsibilities` and `voice` are required; `boundaries`, `safety` and `references` are optional and left out of the output when empty (most bots need no Boundaries). Sections are separated by exactly one blank line.
+
+### Fleet file
+
+`profile` also checks your fleet file, a JSON object of `"<key>": "<name>: <purpose in one line>"` lines. Its path is `--fleet PATH`, else the `BOTKIT_FLEET` environment variable, else `ROOT/fleet.json` (the folder holding the botkit clone). A missing default file is skipped; a `--fleet` or `BOTKIT_FLEET` path that doesn't exist, or a non-string line, is an error. With `--json bots/<name>.json`, a fleet file with no `<name>` line prints a warning and still exits 0:
+
+```sh
+BOTKIT_FLEET=shared/fleet.json python3 botkit/botkit.py profile --json bots/<name>.json -o bots/<name>.md
+```
 
 ## Generate a skill
 
@@ -168,7 +180,7 @@ Run `python3 botkit.py <command> --help` for every flag.
 - Bad arguments, a missing config or any error fail closed to `NEEDS_HUMAN`.
 - The one exception to the single-token output: `inbound-check --help` (or `-h`) on its own prints the usage text.
 
-Edit `inbound-check.json` next to it for your allow list, block list and risky words. `inbound-check.cases.json` maps argument lists to the expected token; `python3 scripts/run_safety_cases.py` runs every `examples/safety/*.cases.json` (or the files you name) and fails on any mismatch. Re-run it whenever the program or its config changes, and add one case from a real past mistake for each new rule. The `ops-check` program named in the infra-bot example isn't included; write your own.
+Edit `inbound-check.json` next to it for your allow list, block list and risky words. `inbound-check.cases.json` maps argument lists to the expected token; `python3 scripts/run_safety_cases.py` runs every `examples/safety/*.cases.json` (or the files you name) and fails on any mismatch. A program that already has a unittest suite in `ROOT/safety/tests/` can keep it instead, run with `python3 -m unittest discover -s ROOT/safety/tests`. Re-run the tests whenever the program or its config changes, and add one case from a real past mistake for each new rule, in whichever form the program uses. The `ops-check` program named in the infra-bot example isn't included; write your own.
 
 ## Development
 

@@ -15,27 +15,30 @@ A Grok Bot is a long-running AI agent; its profile is its whole persona. All of 
 
 ## Installing botkit on a bot computer
 
-A bot doesn't read skills from any folder. It only knows a skill once it saves it through its own skill tool; in Grok Bot that's the `UpdateSkill` tool with action `write` and the full `SKILL.md` content. Copying skill files onto the computer does nothing.
+A bot doesn't read skills from any folder. It only knows a skill once it is saved through a skill tool; in Grok Bot that's the `UpdateSkill` tool with action `write` and the full `SKILL.md` content. Copying skill files onto the computer does nothing. On Grok Bot, skills are global: one library shared by all of the owner's bots, so a skill saved once is known to every bot. Only a setup where each bot has its own skill store needs skills handed to each bot.
 
-`ROOT` is the private workspace folder on the bot computer (usually `/workspace`). Every bot in the fleet shares that computer, so there is one `ROOT`: install once, and every bot runs the same `ROOT/safety/` programs and reads the same `ROOT/references/` files. Skills are the exception, saved per bot. Everything private lives in `ROOT`, outside the clone:
+`ROOT` is the private workspace folder on the bot computer (usually `/workspace`). Every bot in the fleet shares that computer, so there is one `ROOT`: install once, and every bot runs the same `ROOT/safety/` programs and reads the same `ROOT/references/` files. Everything private lives in `ROOT`, outside the clone:
 
 ```text
 ROOT/
   botkit/              clone of this repo; public, never holds private data
-  fleet.json           your fleet: one line per bot
+  fleet.json           your fleet: one line per bot (or set its path, see below)
   bots/<name>.json     each bot's profile fields (input)
   bots/<name>.md       each bot's generated profile (output)
   safety/              your safety check programs (optional)
+  safety/tests/        unittest suite for them (optional, instead of cases files)
   references/          reference files plus INDEX.md (optional)
 ```
+
+The fleet file is `ROOT/fleet.json` unless `BOTKIT_FLEET` names another path; `botkit.py profile --fleet PATH` overrides both. Below, "the fleet file" means that path. `profile` checks it when it exists (an explicit `--fleet` or `BOTKIT_FLEET` path must exist): every value a string, and a warning if the bot of `--json ROOT/bots/<name>.json` has no `<name>` line.
 
 Follow these steps in order. Do each one yourself; ask the owner only where a step says to.
 
 1. **Get the repo.** If `ROOT/botkit` doesn't exist, run `git clone https://github.com/mipmap-ai/botkit ROOT/botkit`. If it exists and is a botkit checkout (`git -C ROOT/botkit remote get-url origin` ends in `botkit` or `botkit.git`, and `ROOT/botkit/botkit.py` exists), run `git -C ROOT/botkit pull --ff-only`. If it exists but isn't a botkit checkout, stop: don't move, delete or overwrite it; tell the owner what's there and ask what to do. Check that `python3 --version` is 3.10 or newer.
-2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order, follow "Saving one botkit skill" below. This saves them on your bot only; other bots get theirs through "Handing skills to other bots".
-3. **Create the fleet file.** If `ROOT/fleet.json` doesn't exist, copy `ROOT/botkit/examples/fleet.example.json` to it. If it exists, leave it untouched. Then, with the owner, replace the three sample bots with the real ones.
-4. **Create the bots folder.** Make `ROOT/bots/` if it's missing. Each bot's input lives at `ROOT/bots/<name>.json`, next to `fleet.json`.
-5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check`, `inbound-check.json` and `inbound-check.cases.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) and its cases with the owner. Run `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/inbound-check.cases.json`; all cases must pass before any profile points at it. Re-run it whenever the program or its config changes, and add one case from a real past mistake for each new rule.
+2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md`, in name order, follow "Saving one botkit skill" below. On Grok Bot this saves them for every bot; only with per-bot skill stores do other bots get theirs through "Handing skills to other bots".
+3. **Create the fleet file.** If the owner already keeps a fleet file elsewhere, set `BOTKIT_FLEET` to its path and create nothing. Otherwise, if `ROOT/fleet.json` doesn't exist, copy `ROOT/botkit/examples/fleet.example.json` to it. If it exists, leave it untouched. Then, with the owner, replace the three sample bots with the real ones.
+4. **Create the bots folder.** Make `ROOT/bots/` if it's missing. Each bot's input lives at `ROOT/bots/<name>.json`.
+5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check`, `inbound-check.json` and `inbound-check.cases.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) and its cases with the owner. Run its safety tests as in "Safety check programs" below; all must pass before any profile points at it.
 6. **References (optional).** Make `ROOT/references/` and an `INDEX.md` there if they're missing; one line per file: `file: what it is / when to read it`.
 7. **Profiles.** For each bot, design it with the design-a-grok-bot skill (saved in step 2) and keep its fields in `ROOT/bots/<name>.json`. Generate its profile:
 
@@ -43,7 +46,7 @@ Follow these steps in order. Do each one yourself; ask the owner only where a st
    python3 ROOT/botkit/botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md
    ```
 
-   Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Add or update the bot's line in `ROOT/fleet.json`: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Then hand the bot its skills as in "Handing skills to other bots".
+   Paste the `.md` output, exactly and in full, into the bot's profile; it's the only text that goes in. Read the live profile back and compare it with the file. Add or update the bot's line in the fleet file: key is the lowercase name with no spaces, value is `"<name>: <purpose in one line>"`. Only with per-bot skill stores, hand the bot its skills as in "Handing skills to other bots".
 8. **Evals.** Make `ROOT/evals/` if it's missing. For each bot, write 6-30 scenarios in `ROOT/evals/<name>.json` if missing (see `ROOT/botkit/examples/evals/inbox-bot.json`), validate with `python3 ROOT/botkit/botkit.py evals --json ROOT/evals/<name>.json`, and run them with the evaluate-a-grok-bot skill before the bot goes live. Results go to `ROOT/evals/<name>.results.json`.
 
 ### Saving one botkit skill
@@ -74,7 +77,7 @@ Used by install step 2, update step 4, and by any bot that is handed a skill (se
 
 ### Handing skills to other bots
 
-You can't save a skill on another bot; only that bot can, with its own skill tool. Who needs which shared skill:
+Skip this section when skills are shared across bots, the Grok Bot default: install step 2 already gave every bot every shared skill. Only where each bot has its own skill store: you can't save a skill on another bot; only that bot can, with its own skill tool. Who needs which shared skill:
 
 - bot-safety-check: every bot whose profile has `Safety:`.
 - bot-references: every bot whose profile has `References:`.
@@ -92,9 +95,9 @@ To update botkit:
 1. Note the current commit: `OLD=$(git -C ROOT/botkit rev-parse HEAD)`.
 2. Run `git -C ROOT/botkit pull --ff-only`.
 3. List the skills that changed: `git -C ROOT/botkit diff --name-status "$OLD" HEAD -- skills/`. `D` means botkit deleted the skill; anything else means it was added or changed.
-4. For each added or changed skill only, follow "Saving one botkit skill" above: a copy with no local changes is updated without asking; a copy with local changes gets the Replace, Merge or Skip question. Then hand it to every other bot that uses it (see "Handing skills to other bots"; check `Safety:` and `References:` in each `ROOT/bots/<name>.md`) so each re-saves it. Leave every other skill alone.
-5. For each skill botkit deleted that you or another bot still has: ask the owner, one question per skill, Keep (leave it as a local skill) or Delete (remove yours through your skill tool, and message each other bot that has it to remove its own). No answer means Keep. Never delete without a yes.
-6. Whenever a skill changes (updated without asking, Replace, or an approved Merge), keep the old content, save the new version, then run the evals of every bot that uses the skill (evaluate-a-grok-bot skill). Keep the new version only if no bot's pass count drops; otherwise save the old content back (and hand it back to the other bots) and report which scenarios failed.
+4. For each added or changed skill only, follow "Saving one botkit skill" above: a copy with no local changes is updated without asking; a copy with local changes gets the Replace, Merge or Skip question. Skip the re-save on other bots when skills are shared across bots (Grok Bot default). Only with per-bot skill stores, hand it to every other bot that uses it (see "Handing skills to other bots"; check `Safety:` and `References:` in each `ROOT/bots/<name>.md`) so each re-saves it. Leave every other skill alone.
+5. For each skill botkit deleted that you or another bot still has: ask the owner, one question per skill, Keep (leave it as a local skill) or Delete (remove it through your skill tool; only with per-bot skill stores, also message each other bot that has it to remove its own). No answer means Keep. Never delete without a yes.
+6. Whenever a skill changes (updated without asking, Replace, or an approved Merge), keep the old content, save the new version, then run the evals of every bot that uses the skill (evaluate-a-grok-bot skill). Keep the new version only if no bot's pass count drops; otherwise save the old content back (and, with per-bot skill stores, hand it back to the other bots) and report which scenarios failed.
 7. If `botkit.py` changed, regenerate each profile as in install step 7. Paste a profile again only if its `.md` changed.
 
 ## Before you commit
@@ -117,7 +120,7 @@ The reader is a model, not a person. Every field is a dash list, even with one i
 - Short names over full ones when unambiguous.
 - **Purpose**: the real reason the bot exists, as the owner states it; not a capability list. One line per part if there's more than one. Agree it with the owner before writing anything else. Use precise verbs: "determine how X transfers to Y" for analysis, not "apply".
 - **Responsibilities**: outcomes the bot owns, true regardless of timing. Schedules and steps belong in routines, never here. Every routine serves one of these lines.
-- **Boundaries**: start from zero. Write one only for an edge the purpose leaves ambiguous, or to name the adjacent verb the bot never does (a drafter doesn't send). Add more only from repeated drift across days and conversations; prefer rewriting Purpose. Drift on many bots at once means a model change, so don't edit profiles for it.
+- **Boundaries**: optional; start from zero (botkit omits the section when empty). Write one only for an edge the purpose leaves ambiguous, or to name the adjacent verb the bot never does (a drafter doesn't send). Add more only from repeated drift across days and conversations; prefer rewriting Purpose. Drift on many bots at once means a model change, so don't edit profiles for it.
 - **Safety**: only if the bot has risky actions. `<program> [parameters]`, program is a bare name in `ROOT/safety/`, `{placeholders}` for values from the action. Action rules (send, delete, buy, paths, numbers) live in that program, never in prose.
 - **References**: only if the bot needs fixed reference material. Bare file names in `ROOT/references/`, each with one line in `INDEX.md`.
 - **Voice**: a few words per line.
@@ -137,12 +140,12 @@ The reader is a model, not a person. Every field is a dash list, even with one i
 
 ## Safety check programs
 
-Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stderr, exit 0; the only exception is `--help` on its own, which prints usage text. Normalize text before matching phrases (NFKC, casefold, collapse whitespace, strip zero-width characters, fold look-alike letters). Fail closed to `NEEDS_HUMAN` on bad input or any error. Decide with deterministic code first, Jev for gray areas, model judgment last. Cases:
+Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stderr, exit 0; the only exception is `--help` on its own, which prints usage text. Normalize text before matching phrases (NFKC, casefold, collapse whitespace, strip zero-width characters, fold look-alike letters). Fail closed to `NEEDS_HUMAN` on bad input or any error. Decide with deterministic code first, Jev for gray areas, model judgment last. Safety tests, in either form:
 
-- Every program has `ROOT/safety/<program>.cases.json`: args mapped to the expected `ALLOW`, `NEEDS_HUMAN` or `IGNORE`.
-- Run `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`; all must pass before a profile points at the program.
-- Re-run whenever the program or its config changes.
-- Each new rule adds one case from a real past mistake; its `why` names the mistake.
+- A cases file, `ROOT/safety/<program>.cases.json` (args mapped to the expected `ALLOW`, `NEEDS_HUMAN` or `IGNORE`), run by `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`.
+- An existing unittest suite in `ROOT/safety/tests/`, run by `python3 -m unittest discover -s ROOT/safety/tests`. Keep it; don't convert it to a cases file.
+- All must pass before a profile points at the program. Re-run whenever the program or its config changes.
+- Each new rule adds one case from a real past mistake, in whichever form the program's tests use: a cases-file entry whose `why` names the mistake, or a test method whose name or docstring does.
 
 ## Writing eval scenarios
 
@@ -161,8 +164,10 @@ Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stde
 | --- | --- |
 | Generated `.md` files match their JSON input | `scripts/regen.py --check` (CI) and the golden and example tests |
 | Output is deterministic: order, LF, one trailing newline | golden tests, byte-identical across runs |
+| Exactly one blank line between sections | `scripts/regen.py` layout check; `LayoutTest` |
 | Required fields present, no unknown fields, one-line items | `botkit.py` field validation (exit 2); error tests |
-| Safety and References omitted when empty | `OmitTest` |
+| Boundaries, Safety and References omitted when empty | `OmitTest` |
+| Fleet file: `--fleet`, else `BOTKIT_FLEET`, else `ROOT/fleet.json` | `botkit.py profile`; `FleetTest` |
 | Safety programs and reference files are bare names | `botkit.py` validation; error tests |
 | Jev questions read `name (yes/no): ...` | `botkit.py` validation (skills and evals) |
 | Templates match the generator's sections | template header test |
@@ -170,8 +175,9 @@ Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stde
 | Shipped docs (`skills/`, `routines/`, AGENTS.md, README) name only skills and `ROOT/botkit/` files that exist in the repo | `SkillsTest` (CI); `ROOT/references/` files are private and not checked |
 | Each shared skill is named after its folder | `SkillsTest` |
 | Eval scenarios: 6-30, 3+ positive, 3+ negative, an injected instruction, no giveaway words in prompt or setup, known check types | `botkit.py evals` (exit 2); evals tests |
-| Every bot with `Safety:` or `References:` has the matching shared skill | no enforcer: "Handing skills to other bots" above |
-| Safety programs give the expected token per case | `scripts/run_safety_cases.py` (CI for the example) |
+| Every bot with `Safety:` or `References:` has the matching shared skill | Grok Bot's shared skill library; with per-bot skill stores, no enforcer: "Handing skills to other bots" above |
+| Safety programs give the expected token per case | `ROOT/safety/<program>.cases.json` run by `scripts/run_safety_cases.py` (CI for the example), or a unittest suite in `ROOT/safety/tests/` run by `python3 -m unittest discover -s ROOT/safety/tests` |
+| Each new safety rule adds a case from a real past mistake | no enforcer: whichever test form the program uses |
 | Safety programs: one token, exit 0, fail closed | safety contract tests and the cases file |
 | No personal data, secrets or private paths in the repo | `scripts/public_safety_scan.py` (CI) |
 | Runs on Python 3.10-3.13, stdlib only | CI matrix |
@@ -181,3 +187,4 @@ Print exactly one of `ALLOW`, `NEEDS_HUMAN`, `IGNORE` on stdout, reasons on stde
 | Purpose agreed with the owner; Boundaries only from repeated drift | no enforcer: design-a-grok-bot skill and the drift routine |
 | Compressed field style; no owner names in profiles | no enforcer: these field-writing rules |
 | Skills with local changes change only after the owner's answer | no enforcer: install and update steps above |
+| Docs agree on safety test forms and on skipping handover for shared skills | `DocsTest` |

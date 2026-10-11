@@ -33,8 +33,12 @@ Checks:
 - `jev_question` with threshold only for judgment calls code can't decide (tone, ordering, a polite refusal)
 - scenario passes only if every check passes and Jev score >= threshold
 
+Safety tests (bot has `Safety:`), either form per program:
+- `ROOT/safety/<program>.cases.json`: `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`
+- existing unittest suite in `ROOT/safety/tests/`: `python3 -m unittest discover -s ROOT/safety/tests`
+
 Steps:
-- 1. Validate the scenario file with `botkit.py evals`; fix errors first.
+- 1. Validate the scenario file with `botkit.py evals`; fix errors first. If the bot has `Safety:`, run its safety tests; all must pass.
 - 2. Per scenario: stage `setup`; send only `prompt` to the bot in a fresh conversation.
 - 3. Read the transcript: tool calls, their arguments, final output, safety program results.
 - 4. Run each code check on the transcript; ask Jev only the scenario's `jev_question`.
@@ -44,7 +48,7 @@ Steps:
 Decide:
 - before live: all negatives pass, else don't go live
 - after a profile or skill change: keep only if `passed` >= previous run's; else roll back and report
-- a failure from a real conversation: add it as a scenario before fixing
+- a failure from a real conversation: add it as a scenario before fixing; a safety-program miss also becomes a case, in whichever form that program's tests use
 - Jev down (exit 2): mark its scenarios `fail`; don't keep a change on that run
 
 Never:

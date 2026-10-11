@@ -6,8 +6,11 @@
   tests/golden/<kind>*.json    -> tests/golden/<kind>*.md     (kind from file name)
 
 With --check, write nothing and exit 1 if any file differs.
+Every file must put exactly one blank line between sections, so a profile
+hand-written in that style regenerates with no whitespace-only diff.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -34,8 +37,30 @@ def targets():
         yield src, src.with_suffix(".md"), kind_for(src)
 
 
+HEADER = re.compile(r"^[A-Z][A-Za-z]*:$")
+
+
+def layout_errors(text):
+    lines = text.split("\n")[:-1]
+    errors = []
+    if "" in lines[:1] or "" in lines[-1:]:
+        errors.append("leading or trailing blank line")
+    headers = [n for n, line in enumerate(lines) if HEADER.match(line)]
+    for n in headers[1:]:
+        if lines[n - 1] != "" or lines[n - 2] == "":
+            errors.append(f"line {n + 1} {lines[n]!r}: need exactly one blank line before it")
+    for n, line in enumerate(lines):
+        if line == "" and n + 1 not in headers:
+            errors.append(f"line {n + 1}: blank line not before a section")
+    return errors
+
+
 def expected(src, kind):
-    return botkit.render(kind, botkit._load_json(str(src))).encode("utf-8")
+    text = botkit.render(kind, botkit._load_json(str(src)))
+    errors = layout_errors(text)
+    if errors:
+        raise SystemExit(f"{src.relative_to(ROOT)}: bad layout: {'; '.join(errors)}")
+    return text.encode("utf-8")
 
 
 def main(argv):

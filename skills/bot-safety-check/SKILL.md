@@ -34,3 +34,12 @@ The program prints exactly one result on stdout. Obey it without second-guessing
 If the program is missing, errors, or prints anything else, treat it as `NEEDS_HUMAN`.
 
 A result you think is wrong: report it to the owner with the args; don't override it.
+
+## Safety tests
+
+Before a profile points at a program, and after any change to it or its config, its tests must all pass, in either form:
+
+- `ROOT/safety/<program>.cases.json`: `python3 ROOT/botkit/scripts/run_safety_cases.py ROOT/safety/<program>.cases.json`
+- an existing unittest suite in `ROOT/safety/tests/`: `python3 -m unittest discover -s ROOT/safety/tests`
+
+Each new rule adds one case from a real past mistake, in whichever form the program uses.

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,16 +16,19 @@ EXAMPLES = ROOT / "examples"
 GOLDEN_CASES = {
     "profile-full": "profile",
     "profile-minimal": "profile",
+    "profile-no-boundaries": "profile",
+    "profile-empty-boundaries": "profile",
     "skill": "skill",
     "jev-skill": "jev-skill",
     "evals": "evals",
 }
 
 
-def botkit(*args, stdin=None):
+def botkit(*args, stdin=None, env=None, script=BOTKIT):
+    base = {k: v for k, v in os.environ.items() if k != "BOTKIT_FLEET"}
     return subprocess.run(
-        [sys.executable, str(BOTKIT), *map(str, args)],
-        capture_output=True, input=stdin, cwd=ROOT,
+        [sys.executable, str(script), *map(str, args)],
+        capture_output=True, input=stdin, cwd=ROOT, env={**base, **(env or {})},
     )
 
 
@@ -132,7 +136,109 @@ class OmitTest(unittest.TestCase):
     def test_absent_equals_empty(self):
         out = botkit("profile", "--purpose", "p", "--responsibility", "r",
                      "--boundary", "b", "--voice", "v").stdout
-        self.assertEqual(out, b"Purpose:\n- p\nResponsibilities:\n- r\nBoundaries:\n- b\nVoice:\n- v\n")
+        self.assertEqual(out, b"Purpose:\n- p\n\nResponsibilities:\n- r\n\nBoundaries:\n- b\n\nVoice:\n- v\n")
+
+    def test_boundaries_optional(self):
+        missing = botkit("profile", "--json", GOLDEN / "profile-no-boundaries.json")
+        self.assertEqual(missing.returncode, 0, missing.stderr.decode())
+        self.assertEqual(headers(missing.stdout.decode()), ["Purpose:", "Responsibilities:", "Voice:"])
+        empty = botkit("profile", "--json", GOLDEN / "profile-empty-boundaries.json")
+        self.assertEqual(empty.returncode, 0, empty.stderr.decode())
+        self.assertEqual(headers(empty.stdout.decode()),
+                         ["Purpose:", "Responsibilities:", "References:", "Voice:"])
+        flags = botkit("profile", "--purpose", "p", "--responsibility", "r", "--voice", "v").stdout
+        self.assertEqual(flags, b"Purpose:\n- p\n\nResponsibilities:\n- r\n\nVoice:\n- v\n")
+
+
+class LayoutTest(unittest.TestCase):
+    HAND_WRITTEN = (
+        "Purpose:\n- spot mentions worth answering\n\n"
+        "Responsibilities:\n- scan new mentions\n- flag ones needing a reply\n\n"
+        "Boundaries:\n- scouts only; never posts\n\n"
+        "Voice:\n- one line each\n"
+    )
+
+    def test_hand_written_profile_regenerates_without_diff(self):
+        out = botkit("profile", "--json", GOLDEN / "profile-minimal.json").stdout.decode()
+        self.assertEqual(out, self.HAND_WRITTEN)
+
+    def test_regen_layout_rule(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        self.addCleanup(sys.path.remove, str(ROOT / "scripts"))
+        import regen
+        self.assertEqual(regen.layout_errors(self.HAND_WRITTEN), [])
+        for bad in ("Purpose:\n- p\nVoice:\n- v\n", "Purpose:\n- p\n\n\nVoice:\n- v\n",
+                    "Purpose:\n- p\n\n- q\n\nVoice:\n- v\n", "\nPurpose:\n- p\n"):
+            with self.subTest(bad=bad):
+                self.assertNotEqual(regen.layout_errors(bad), [])
+        for path in sorted(GOLDEN.glob("*.md")) + sorted(EXAMPLES.glob("*/*.md")):
+            with self.subTest(path.name):
+                self.assertEqual(regen.layout_errors(path.read_text(encoding="utf-8")), [])
+
+
+class FleetTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        self.bot = self.dir / "inbox-bot.json"
+        self.bot.write_bytes((EXAMPLES / "profiles" / "inbox-bot.json").read_bytes())
+
+    def fleet(self, name, data):
+        path = self.dir / name
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def profile(self, *extra, env=None, script=BOTKIT):
+        return botkit("profile", "--json", self.bot, *extra, env=env, script=script)
+
+    def test_listed_bot_is_silent(self):
+        path = self.fleet("f.json", {"inbox-bot": "inbox-bot: triage"})
+        for r in (self.profile("--fleet", path), self.profile(env={"BOTKIT_FLEET": str(path)})):
+            self.assertEqual(r.returncode, 0, r.stderr.decode())
+            self.assertEqual(r.stderr, b"")
+            self.assertEqual(r.stdout, (EXAMPLES / "profiles" / "inbox-bot.md").read_bytes())
+
+    def test_unlisted_bot_warns(self):
+        path = self.fleet("f.json", {"feed-bot": "feed-bot: feeds"})
+        r = self.profile("--fleet", path)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("botkit: warning: ", r.stderr.decode())
+        self.assertIn("no line for 'inbox-bot'", r.stderr.decode())
+
+    def test_flag_wins_over_env(self):
+        listed = self.fleet("listed.json", {"inbox-bot": "inbox-bot: triage"})
+        unlisted = self.fleet("unlisted.json", {})
+        r = self.profile("--fleet", listed, env={"BOTKIT_FLEET": str(unlisted)})
+        self.assertEqual(r.stderr, b"")
+        r = self.profile("--fleet", unlisted, env={"BOTKIT_FLEET": str(listed)})
+        self.assertIn(str(unlisted), r.stderr.decode())
+
+    def test_default_is_root_fleet_json(self):
+        clone = self.dir / "botkit"
+        clone.mkdir()
+        shutil.copy2(BOTKIT, clone / "botkit.py")
+        r = self.profile(script=clone / "botkit.py")
+        self.assertEqual((r.returncode, r.stderr), (0, b""))
+        self.fleet("fleet.json", {"feed-bot": "feed-bot: feeds"})
+        r = self.profile(script=clone / "botkit.py")
+        self.assertIn(str(self.dir / "fleet.json"), r.stderr.decode())
+        r = self.profile(script=clone / "botkit.py", env={"BOTKIT_FLEET": str(self.dir / "nope.json")})
+        self.assertEqual(r.returncode, 2)
+
+    def test_bad_fleet_files(self):
+        cases = [
+            (["--fleet", self.dir / "missing.json"], None, "not found"),
+            ([], {"BOTKIT_FLEET": str(self.dir / "missing.json")}, "not found"),
+            (["--fleet", self.fleet("list.json", ["inbox-bot"])], None, "JSON object"),
+            (["--fleet", self.fleet("num.json", {"inbox-bot": 3})], None, "fleet line for 'inbox-bot'"),
+        ]
+        for extra, env, needle in cases:
+            with self.subTest(needle=needle, env=env):
+                r = self.profile(*extra, env=env)
+                self.assertEqual(r.returncode, 2)
+                self.assertEqual(r.stdout, b"")
+                self.assertIn(needle, r.stderr.decode())
 
     def test_skill_optional_sections_left_out(self):
         out = botkit("skill", "--purpose", "p", "--step", "s").stdout
@@ -155,8 +261,9 @@ class ErrorTest(unittest.TestCase):
         return fh.name
 
     def test_missing_required_flags(self):
-        self.assertFails(botkit("profile", "--purpose", "p"),
-                         "missing required field", "responsibilities", "boundaries", "voice")
+        r = botkit("profile", "--purpose", "p")
+        self.assertFails(r, "missing required field", "responsibilities", "voice")
+        self.assertNotIn("boundaries", r.stderr.decode())
 
     def test_missing_required_json(self):
         path = self.json_file({"responsibilities": ["r"], "boundaries": ["b"], "voice": ["v"]})
@@ -476,6 +583,53 @@ class SkillsTest(unittest.TestCase):
             listed += names.split(", ")
         self.assertEqual(sorted(listed), sorted(p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")))
 
+
+def read(rel):
+    return (ROOT / rel).read_text(encoding="utf-8")
+
+
+def section(text, heading):
+    return re.search(rf"(?ms)^{re.escape(heading)}\n(.*?)(?=^#|\Z)", text).group(1)
+
+
+class DocsTest(unittest.TestCase):
+    SAFETY_DOCS = {
+        "AGENTS.md": "## Safety check programs",
+        "skills/bot-safety-check/SKILL.md": "## Safety tests",
+        "skills/evaluate-a-grok-bot/SKILL.md": None,
+        "skills/design-a-grok-bot/SKILL.md": "## Safety check (only if the bot has risky actions)",
+    }
+
+    def test_safety_tests_accept_cases_file_or_unittest_suite(self):
+        table = section(read("AGENTS.md"), "## Rules and their enforcers")
+        texts = {**{rel: section(read(rel), h) if h else read(rel) for rel, h in self.SAFETY_DOCS.items()},
+                 "rule-to-enforcer table": table}
+        for name, text in texts.items():
+            with self.subTest(name):
+                self.assertIn("<program>.cases.json", text)
+                self.assertIn("scripts/run_safety_cases.py", text)
+                self.assertIn("ROOT/safety/tests/", text)
+                self.assertIn("python3 -m unittest discover -s ROOT/safety/tests", text)
+        for name in ("AGENTS.md", "skills/bot-safety-check/SKILL.md", "skills/evaluate-a-grok-bot/SKILL.md",
+                     "skills/design-a-grok-bot/SKILL.md"):
+            with self.subTest(name, rule="past mistake"):
+                self.assertIn("in whichever form", texts[name])
+
+    def test_handover_skipped_when_skills_are_shared(self):
+        agents = read("AGENTS.md")
+        design = read("skills/design-a-grok-bot/SKILL.md")
+        update = re.search(r"(?m)^4\. For each added or changed skill only.*$", agents).group(0)
+        handover = re.search(r"(?m)^\d\. Skip this step when skills are shared across bots.*$",
+                             section(design, "## After create")).group(0)
+        for name, text in (("handing section", section(agents, "### Handing skills to other bots")),
+                           ("update re-save", update), ("design After create", handover)):
+            with self.subTest(name):
+                self.assertRegex(text, r"[Ss]kip .*when skills are shared across bots")
+                self.assertIn("Grok Bot default", text)
+                self.assertIn("own skill store", text) if name == "handing section" else \
+                    self.assertIn("per-bot skill stores", text)
+        for text in (agents, read("README.md"), design):
+            self.assertIn("one library", text)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,7 @@
+{
+  "purpose": "keep shared notes current",
+  "responsibilities": ["merge new notes into the right page", "flag notes that contradict each other"],
+  "boundaries": [],
+  "references": ["notes-index.md"],
+  "voice": "plain words"
+}

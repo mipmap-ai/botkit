@@ -7,6 +7,7 @@ order, LF line endings, one trailing newline.
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -56,8 +57,9 @@ SPECS = {
         Field("responsibilities", "Responsibilities",
               ["--responsibility", "--responsibilities"], required=True,
               help="outcome the bot owns (repeatable)"),
-        Field("boundaries", "Boundaries", ["--boundary", "--boundaries"], required=True,
-              help="edge the purpose leaves ambiguous, or the adjacent verb it never does (repeatable)"),
+        Field("boundaries", "Boundaries", ["--boundary", "--boundaries"],
+              help="edge the purpose leaves ambiguous, or the adjacent verb it never does "
+                   "(repeatable; omitted when empty)"),
         Field("safety", "Safety", ["--safety"],
               help="'<program> [parameters]', bare program name (repeatable; omitted when empty)"),
         Field("references", "References", ["--reference", "--references"],
@@ -320,16 +322,47 @@ def check_links(kind, data, root):
     return warnings
 
 
+FLEET_ENV = "BOTKIT_FLEET"
+
+
+def fleet_path(flag=None):
+    """Return (path, explicit): --fleet, else $BOTKIT_FLEET, else ROOT/fleet.json.
+
+    ROOT is the folder holding the botkit clone (botkit.py is ROOT/botkit/botkit.py).
+    """
+    if flag:
+        return Path(flag), True
+    env = os.environ.get(FLEET_ENV, "").strip()
+    if env:
+        return Path(env), True
+    return Path(__file__).resolve().parent.parent / "fleet.json", False
+
+
+def check_fleet(path, explicit, key):
+    """Validate the fleet file; warn if it has no line for key.
+
+    A missing default file is skipped; a missing --fleet or $BOTKIT_FLEET file is an error.
+    """
+    if not path.is_file():
+        if explicit:
+            raise BotkitError(f"fleet file {path} not found (from --fleet or ${FLEET_ENV})")
+        return []
+    fleet = _load_json(str(path))
+    for k, v in fleet.items():
+        if not isinstance(v, str) or not v.strip():
+            raise BotkitError(f"{path}: fleet line for {k!r} must be \"<name>: <purpose in one line>\"")
+    if key is not None and key not in fleet:
+        return [f"{path} has no line for '{key}'; add \"{key}\": \"<name>: <purpose in one line>\""]
+    return []
+
+
 def render(kind, data):
     if kind == "evals":
         return render_evals(data)
     f = normalize(kind, data)
     if kind == "profile":
-        lines = []
-        for field in SPECS["profile"]:
-            if f[field.key]:
-                lines += _section(field.label, f[field.key])
-        return "\n".join(lines) + "\n"
+        blocks = [_section(field.label, f[field.key]) for field in SPECS["profile"] if f[field.key]]
+        return "\n\n".join("\n".join(b) for b in blocks) + "\n"
 
     blocks = [_section("Purpose", f["purpose"])]
     if f["input"]:
@@ -402,6 +435,11 @@ def cmd_generate(args):
     warnings = []
     if getattr(args, "root", None) is not None:
         warnings = check_links(kind, data, args.root)
+    if kind == "profile":
+        key = None
+        if args.json not in (None, "-"):
+            key = re.sub(r"\s+", "", Path(args.json).stem.lower())
+        warnings = check_fleet(*fleet_path(args.fleet), key)
     _write(text, args.out)
     for w in warnings:
         print(f"botkit: warning: {w}", file=sys.stderr)
@@ -430,7 +468,12 @@ def build_parser():
         sp = sub.add_parser(kind, help=helps[kind], description=helps[kind] + ".")
         sp.add_argument("--json", metavar="FILE", help="read fields from a JSON object ('-' for stdin)")
         sp.add_argument("-o", "--out", metavar="FILE", help="write to FILE instead of stdout")
-        if kind != "profile":
+        if kind == "profile":
+            sp.add_argument(
+                "--fleet", metavar="PATH",
+                help=f"fleet file to check (default: ${FLEET_ENV}, else ROOT/fleet.json beside the "
+                     "botkit clone); warns if it has no line for the --json file's bot")
+        else:
             sp.add_argument(
                 "--root", metavar="DIR",
                 help="fail if an item names a skills/<name> or references/<file> missing under DIR "
