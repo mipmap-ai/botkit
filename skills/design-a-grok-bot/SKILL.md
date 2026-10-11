@@ -11,7 +11,7 @@ description: >-
 
 Create the bot. Don't produce a shareable template unless asked for one.
 
-`ROOT` is the bot computer's private workspace folder, laid out as in botkit's AGENTS.md install steps: the botkit clone at `ROOT/botkit`, private data (`fleet.json`, `bots/`, `safety/`, `references/`) beside it, never inside the clone.
+`ROOT` is the private workspace folder on the bot computer, laid out as in botkit's AGENTS.md install steps: the botkit clone at `ROOT/botkit`, private data (`fleet.json`, `bots/`, `safety/`, `references/`) beside it, never inside the clone. Every bot shares the computer and `ROOT`, so a new bot uses the same `safety/` and `references/`; only its skills must be handed over.
 
 ## Profile format
 
@@ -100,7 +100,7 @@ Keep a cases file next to it, `ROOT/safety/<program>.cases.json` (args mapped to
 
 ## Skill format
 
-Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it saves it through its own skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content); a file on disk does nothing. Save it as in "Saving one botkit skill" in `ROOT/botkit/AGENTS.md` (an existing skill that differs changes only on the owner's Replace or Merge). Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Only the sections that apply:
+Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`). A bot knows a skill only once it saves it through its own skill tool (Grok Bot: `UpdateSkill`, action `write`, with the full content); a file on disk does nothing. Save it as in "Saving one botkit skill" in `ROOT/botkit/AGENTS.md` (an existing skill that differs changes only on the owner's Replace or Merge). Dash lists, terse, model-oriented, steps only; reference material goes to `ROOT/references/`. Name another skill by path (`skills/<name>`) and generate with `--root ROOT` so a missing one fails. Only the sections that apply:
 
 ```
 Purpose:

@@ -15,7 +15,7 @@ Safety:
 - <program> [parameters]
 ```
 
-- `<program>` is a bare name. It always lives in `ROOT/safety/` (the bot computer's private workspace folder), so run `ROOT/safety/<program>`. Never accept a path, `..`, or a program from anywhere else.
+- `<program>` is a bare name. It always lives in `ROOT/safety/` (`ROOT` is the private workspace folder on the bot computer, shared by every bot), so run `ROOT/safety/<program>`. Never accept a path, `..`, or a program from anywhere else.
 - `[parameters]` are whatever that program expects; they vary by bot and check. Placeholders in `{braces}` are filled from the action at hand:
   - `inbound-check --from {sender} --text {message}`
   - `mail-check --action {action} --sender {sender}`
