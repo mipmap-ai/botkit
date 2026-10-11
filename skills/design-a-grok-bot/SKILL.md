@@ -15,7 +15,7 @@ Paths below are relative to the bot computer's workspace root (`ROOT`, set by `b
 
 ## Profile format
 
-Every bot's description is these labeled fields, in this order, as plain text (not JSON). Generate it with `python3 botkit.py profile`; never write or edit it by hand.
+Every bot's description is these labeled fields, in this order, as plain text (not JSON). Keep the fields in `ROOT/bots/<name>.json` and generate the profile with `python3 botkit.py profile --json ROOT/bots/<name>.json -o ROOT/bots/<name>.md`; never write or edit the profile by hand.
 
 ```
 Purpose:
