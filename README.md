@@ -2,7 +2,7 @@
 
 Versioned public templates for Grok Bot profiles, skills and evals, plus a deterministic CLI that generates them.
 
-- A **Grok Bot** is a long-running AI agent with its own computer, chats and scheduled routines; its profile (the description it's created with) is its whole persona, re-read on every wake.
+- A **Grok Bot** is a long-running AI agent with its own chats, scheduled routines and desktop. All of an owner's Grok Bots share one bot computer, so its files (including the safety checks and reference files botkit sets up) are shared by every bot. Its profile (the description it's created with) is its whole persona, re-read on every wake.
 - **Jev** is a scoring API used for yes/no judgments: a skill sends it fixed questions plus an input and gets a score per question back.
 
 `botkit.py` is one file, Python 3.10+, standard library only. It prints bot profiles, skills and eval scenarios in a fixed format: `profile`, `skill`, `jev-skill` and `evals` are its only commands.
@@ -13,7 +13,7 @@ A bot only knows a skill once it saves it through its own skill tool, so there's
 
 > Follow the "Installing botkit on a bot computer" steps in botkit's AGENTS.md.
 
-The bot clones the repo, saves the shared skills through its skill tool, hands bot-safety-check and bot-references to each bot whose profile has `Safety:` or `References:` (only a bot itself can save its skills), and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps.
+The bot clones the repo, saves the shared skills through its skill tool, hands bot-safety-check and bot-references to each bot whose profile has `Safety:` or `References:` (only a bot itself can save its skills), and sets up its private fleet file, `bots/` folder and optional safety check outside the clone. Re-running the steps changes nothing that already exists without the owner's answer: identical skills are skipped, and for a skill whose content differs the bot shows a short summary of the differences and asks you to Replace, Merge or Skip. AGENTS.md also has the update steps; there, a copy with no local changes is updated without asking.
 
 To use botkit on your own machine, clone the repo and run `python3 botkit.py` from the clone.
 
@@ -116,10 +116,10 @@ python3 botkit.py jev-skill --name mention-scout \
 
 That prints the same bytes as `python3 botkit.py jev-skill --json tests/golden/jev-skill.json` (in JSON the Jev-down field is `jev_down`).
 
-`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a skill (`skills/<name>` or `the <name> skill`) or a `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`). Only the skill you're generating is checked. Hyphenated modifiers such as `follow-up` or `well-known` aren't treated as skill names, and `a <name> skill` isn't checked. The shared skills in `skills/` are hand-written; a test checks in CI that they, the routines and the docs name only skills and `ROOT/botkit/` files that exist in the repo.
+`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a `skills/<name>` or `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`). Only the skill you're generating is checked. Name other skills by path; a phrase like `the <name> skill` with an unknown name only prints a warning (the "name" may really be an adjective such as follow-up) and still exits 0. The shared skills in `skills/` are hand-written; a test checks in CI that they, the routines and the docs name only skills and `ROOT/botkit/` files that exist in the repo.
 
 ```sh
-python3 botkit.py skill --root . --purpose "check a new bot" --step "follow the evaluate-a-grok-bot skill"
+python3 botkit.py skill --root . --purpose "check a new bot" --step "follow skills/evaluate-a-grok-bot/SKILL.md"
 ```
 
 ## Eval scenarios
@@ -131,7 +131,7 @@ python3 botkit.py evals --json examples/evals/inbox-bot.json -o /tmp/inbox-bot-e
 ```
 
 - At least 3 `positive` scenarios (typical requests) and 3 `negative` ones, each with a `negative_type`: `adjacent-action`, `out-of-scope`, `injected-instruction` (at least one is required) or `quiet`.
-- Each scenario has an `id`, a `prompt` that reads like a normal request, an optional `setup` (in both, the words eval, test, judge and judgment are rejected), and one or more `checks`: `tool_called`, `tool_not_called`, `output_contains`, `output_not_contains`, `safety_token` or `no_output`.
+- Each scenario has an `id`, a `prompt` that reads like a normal request, an optional `setup` (in both, the words eval, test, judge and judgment are rejected; this is deliberately conservative, so reword staged content like "a blood-test reminder"), and one or more `checks`: `tool_called`, `tool_not_called`, `output_contains`, `output_not_contains`, `safety_token` or `no_output`.
 - An optional `jev_question` with a `threshold` covers judgment calls code can't decide.
 
 See `templates/evals.md` and `examples/evals/inbox-bot.md`.
