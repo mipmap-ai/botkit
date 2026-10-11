@@ -2,6 +2,7 @@
 """Example safety check for acting on an inbound message.
 
 Usage: inbound-check --from SENDER --text MESSAGE [--config FILE]
+       inbound-check --help    (prints this text instead of a result)
 
 Prints exactly one of ALLOW, NEEDS_HUMAN, IGNORE to stdout, writes the reason
 to stderr and exits 0. Anything unexpected (bad arguments, missing or invalid
@@ -15,13 +16,15 @@ Rules, in order:
 
 The config defaults to inbound-check.json next to this program:
   {"allow": [...], "block": [...], "risky_words": [...]}
-Senders compare case-insensitively; risky words match whole words.
+Senders, text and risky words are normalized before comparing: NFKC, casefold,
+every whitespace run collapsed to one space. Risky words match whole words.
 """
 
 import json
 import os
 import re
 import sys
+import unicodedata
 
 ALLOW, NEEDS_HUMAN, IGNORE = "ALLOW", "NEEDS_HUMAN", "IGNORE"
 
@@ -43,19 +46,24 @@ def load_config(path):
         vals = cfg.get(key, [])
         if not isinstance(vals, list) or not all(isinstance(v, str) and v.strip() for v in vals):
             raise BadInput(f"config '{key}' must be a list of non-empty strings")
-        out[key] = [v.strip().lower() for v in vals]
+        out[key] = [normalize(v) for v in vals]
     return out
 
 
+def normalize(s):
+    """NFKC, casefold, every whitespace run to one space, trimmed."""
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s).casefold()).strip()
+
+
 def decide(sender, text, cfg):
-    who = sender.strip().lower()
+    who = normalize(sender)
     if who in cfg["block"]:
         return IGNORE, f"sender {sender!r} is blocked"
     if who not in cfg["allow"]:
         return NEEDS_HUMAN, f"sender {sender!r} is not on the allow list"
-    lowered = text.lower()
+    norm = normalize(text)
     for word in cfg["risky_words"]:
-        if re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", lowered):
+        if re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", norm):
             return NEEDS_HUMAN, f"text mentions risky word {word!r}"
     return ALLOW, "known sender, no risky words"
 
