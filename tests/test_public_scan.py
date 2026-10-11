@@ -30,6 +30,12 @@ EXTRA_SAMPLES = [
     ("secret assignment", "TOKEN" + "=" + "deadbeef" * 4),
     ("secret assignment", "export API_SECRET" + "=" + "U2VjcmV0" * 4 + "=="),
     ("secret assignment", "db_pass" + " = " + "a1b2c3d4e5f6a7b8c9d0e1f2"),
+    ("secret assignment", "SESSION" + "=" + "aB3dE5gH7jK9mN1pQ3sT5vW7"),
+    ("secret assignment", "token" + ": " + "aB3dE5gH7jK9mN1pQ3sT5vW7xY9zA1cD"),
+    ("secret assignment", "  api_key" + ": " + "0123456789abcdef0123"),
+    ("secret assignment", "secret" + ":" + "s3cr3tvalue_long_enough"),
+    ("secret assignment", "db_password" + ": " + "hunter2hunter2hunter2"),
+    ("secret assignment", "deploy-key" + ": " + "Zm9vYmFyYmF6cXV4cXV1eA=="),
 ]
 EXTRA_CLEAN = [
     "id 1234567890123",
@@ -38,6 +44,17 @@ EXTRA_CLEAN = [
     "MODE=production_deployment_settings",
     "the bearer of bad news",
     "python -m unittest discover -s tests -v",
+    "result = compute_value_from_input2",
+    "x = some_long_function_name_v2(arg)",
+    "name = design_a_grok_bot_skill_v2",
+    "MAX_RETRIES = DEFAULT_RETRY_COUNT_FOR_HTTP2",
+    "cls = SomeVeryLongClassNameV2.from_config(cfg)",
+    "token: {token}",
+    "token: $GITHUB_TOKEN",
+    "key: value",
+    "primary_key: customer_identifier_column",
+    "secret: <your secret here>",
+    "description: Use when asked to clean up old drafts",
 ]
 CLEAN = [
     "uses: actions/checkout" + AT + "v4",

@@ -36,9 +36,15 @@ PATTERNS = [
      r"(?i)\b(?:api[_-]?key|secret|token|passwd|password|auth)\b[\"']?\s*[:=]\s*[\"'][^\"'\s{}<>]{12,}[\"']"),
     ("bearer token", r"(?i)\bauthorization\s*[:=]\s*[\"']?bearer\s+[A-Za-z0-9._~+/-]{8,}=*"),
     ("bearer token", r"(?i)\bbearer\s+[A-Za-z0-9._~+/-]{20,}=*"),
+    # Unquoted NAME=value: the value must look like hex, padded base64, or a
+    # mixed-case token with a digit, so plain snake_case identifiers don't match.
     ("secret assignment",
      r"\b[A-Za-z_][A-Za-z0-9_]*\s*=\s*(?:[0-9a-fA-F]{24,}"
-     r"|(?=[A-Za-z0-9+/_-]*\d)(?=[A-Za-z0-9+/_-]*[A-Za-z])[A-Za-z0-9+/_-]{24,}={0,2})(?![\w+/=-])"),
+     r"|[A-Za-z0-9+/]{20,}={1,2}"
+     r"|(?=[\w+/-]*\d)(?=[\w+/-]*[a-z])(?=[\w+/-]*[A-Z])[A-Za-z0-9+/_-]{24,})(?![\w+/=(.-])"),
+    ("secret assignment",
+     r"(?i)\b(?:[a-z0-9_-]*[_-])?(?:token|secret|password|passwd|api[_-]?key|key)\s*:\s*"
+     r"(?=[A-Za-z0-9+/_.=-]*\d)(?=[A-Za-z0-9+/_.=-]*[A-Za-z])[A-Za-z0-9+/_.=-]{16,}(?![^\s#])"),
     ("url credentials", r"[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@"),
 ]
 COMPILED = [(name, re.compile(rx)) for name, rx in PATTERNS]
