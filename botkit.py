@@ -161,7 +161,8 @@ CHECKS = ("tool_called", "tool_not_called", "output_contains", "output_not_conta
 NEGATIVE_TYPES = ("adjacent-action", "out-of-scope", "injected-instruction", "quiet")
 SAFETY_TOKENS = ("ALLOW", "NEEDS_HUMAN", "IGNORE")
 TOOL_NAME = re.compile(r"^[A-Za-z0-9_.:-]+$")
-GIVEAWAY = re.compile(r"(?i)\b(?:evals?|evaluat\w*|tests?|testing|tested|judge[sd]?|judging)\b")
+GIVEAWAY = re.compile(r"(?i)\b(?:evals?|evaluat\w*|tests?|testing|tested|judge[sd]?|judging|judge?ments?)\b")
+MAX_SCENARIOS = 30
 SCENARIO_KEYS = ("id", "kind", "negative_type", "setup", "prompt", "checks", "jev_question")
 
 
@@ -215,8 +216,8 @@ def render_evals(data):
     if not isinstance(bot, str) or not SKILL_NAME.match(bot):
         raise BotkitError("field 'bot': required, lowercase words joined by '-'")
     scenarios = data.get("scenarios")
-    if not isinstance(scenarios, list) or not 6 <= len(scenarios) <= 10:
-        raise BotkitError("field 'scenarios': required, a list of 6 to 10 scenarios")
+    if not isinstance(scenarios, list) or not 6 <= len(scenarios) <= MAX_SCENARIOS:
+        raise BotkitError(f"field 'scenarios': required, a list of 6 to {MAX_SCENARIOS} scenarios")
 
     blocks = [_section("Bot", [bot])]
     seen, kinds, negatives = set(), [], []
@@ -251,17 +252,18 @@ def render_evals(data):
                 raise BotkitError(f"{where}: 'negative_type' is only for negative scenarios")
             kind_line = "positive"
         kinds.append(kind)
-        prompt = _line(where, sc["prompt"], "prompt")
-        word = GIVEAWAY.search(prompt)
-        if word:
-            raise BotkitError(f"{where}: prompt must read like a normal request; drop {word.group(0)!r}")
+        items = [f"id: {sid}", f"kind: {kind_line}"]
+        for key in ("setup", "prompt"):
+            if key not in sc:
+                continue
+            text = _line(where, sc[key], key)
+            word = GIVEAWAY.search(text)
+            if word:
+                raise BotkitError(f"{where}: {key} must read like a normal request; drop {word.group(0)!r}")
+            items.append(f"{key}: {text}")
         checks = sc["checks"]
         if not isinstance(checks, list) or not checks:
             raise BotkitError(f"{where}: 'checks' must be a non-empty list")
-        items = [f"id: {sid}", f"kind: {kind_line}"]
-        if "setup" in sc:
-            items.append(f"setup: {_line(where, sc['setup'], 'setup')}")
-        items.append(f"prompt: {prompt}")
         items += [f"check: {_check(where, c)}" for c in checks]
         if "jev_question" in sc:
             items.append(f"jev: {_jev(where, sc['jev_question'])}")
@@ -278,7 +280,12 @@ def render_evals(data):
 
 
 SKILL_PATH = re.compile(r"(?<![\w.-])skills/([a-z0-9]+(?:-[a-z0-9]+)*)")
-SKILL_PHRASE = re.compile(r"\b([a-z0-9]+(?:-[a-z0-9]+)+) skill\b")
+SKILL_PHRASE = re.compile(r"\b[Tt]he (?:shared )?([a-z0-9]+(?:-[a-z0-9]+)+) skill\b")
+# Hyphenated modifiers that read as "the <adjective> skill", not a skill's name.
+NOT_SKILL_NAMES = frozenset((
+    "built-in", "follow-up", "high-level", "long-running", "low-level", "one-off",
+    "read-only", "same-day", "step-by-step", "top-level", "up-to-date", "well-known",
+))
 REFERENCE_PATH = re.compile(r"(?<![\w.-])references/([^\s`'\"(),;:{}<>]+)")
 
 
@@ -295,7 +302,7 @@ def check_links(kind, data, root):
     for key in ("purpose", "input", "questions", "steps", "decide", "thresholds", "jev_down", "run", "never"):
         for n, item in enumerate(f.get(key, []), 1):
             where = f"field '{key}' item {n}"
-            names = set(SKILL_PATH.findall(item)) | set(SKILL_PHRASE.findall(item))
+            names = set(SKILL_PATH.findall(item)) | (set(SKILL_PHRASE.findall(item)) - NOT_SKILL_NAMES)
             for name in sorted(names):
                 if not any((base / "skills" / name / "SKILL.md").is_file()
                            for base in (root, root / "botkit")):
@@ -419,14 +426,14 @@ def build_parser():
         if kind != "profile":
             sp.add_argument(
                 "--root", metavar="DIR",
-                help="fail if an item names a skill (skills/<name> or '<name> skill') or a "
+                help="fail if an item names a skill (skills/<name> or 'the <name> skill') or a "
                      "references/<file> missing under DIR (skills also found in DIR/botkit/skills)")
         for f in spec:
             sp.add_argument(*f.flags, dest=f.key, action="append", metavar="TEXT", help=f.help)
         sp.set_defaults(func=cmd_generate)
     ep = sub.add_parser(
         "evals", help="validate and print a bot's eval scenarios",
-        description="Validate and print a bot's eval scenarios: 6 to 10, at least 3 positive "
+        description=f"Validate and print a bot's eval scenarios: 6 to {MAX_SCENARIOS}, at least 3 positive "
                     "and 3 negative, at least one negative of type injected-instruction.")
     ep.add_argument("--json", metavar="FILE", required=True, help="scenario file ('-' for stdin)")
     ep.add_argument("-o", "--out", metavar="FILE", help="write to FILE instead of stdout")

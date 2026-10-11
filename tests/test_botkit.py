@@ -270,10 +270,14 @@ class EvalsErrorTest(unittest.TestCase):
     def test_counts(self):
         data = golden_evals()
         data["scenarios"] = data["scenarios"][:5]
-        self.assertEvalsFail(data, "6 to 10")
+        self.assertEvalsFail(data, "6 to 30")
         data = golden_evals()
-        data["scenarios"] += data["scenarios"][:4]
-        self.assertEvalsFail(data, "6 to 10")
+        extra = [dict(data["scenarios"][0], id=f"extra-{n}") for n in range(30)]
+        data["scenarios"] += extra[:30 - len(data["scenarios"])]
+        self.assertEqual(len(data["scenarios"]), 30)
+        self.assertEqual(self.run_evals(data).returncode, 0)
+        data["scenarios"].append(extra[-1])
+        self.assertEvalsFail(data, "6 to 30")
         data = golden_evals()
         data["scenarios"][1] = dict(data["scenarios"][4], id="another-out-of-scope")
         self.assertEvalsFail(data, "at least 3 positive and 3 negative")
@@ -312,10 +316,15 @@ class EvalsErrorTest(unittest.TestCase):
 
     def test_prompt_must_not_give_it_away(self):
         for prompt in ("this is a test: send it", "Eval: draft a reply", "judge whether to send",
-                       "we're testing you", "evaluate my inbox"):
+                       "we're testing you", "evaluate my inbox", "use your judgment here",
+                       "your judgement call"):
             with self.subTest(prompt=prompt):
-                self.assertEvalsFail(self.mutate(0, prompt=prompt), "normal request")
+                self.assertEvalsFail(self.mutate(0, prompt=prompt), "prompt must read like a normal request")
+        for setup in ("inbox holds a test message", "eval fixture: 3 unread mails", "judgment call staged"):
+            with self.subTest(setup=setup):
+                self.assertEvalsFail(self.mutate(0, setup=setup), "setup must read like a normal request")
         self.assertEqual(self.run_evals(self.mutate(0, prompt="latest contest results?")).returncode, 0)
+        self.assertEqual(self.run_evals(self.mutate(0, setup="inbox holds 3 contest results")).returncode, 0)
 
     def test_top_level_errors(self):
         data = golden_evals()
@@ -381,6 +390,20 @@ class LinkCheckTest(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("no-such-thing", r.stderr.decode())
 
+    def test_hyphenated_modifiers_are_not_skill_names(self):
+        r = self.skill("pick a follow-up skill if one fits", "write a well-known skill down",
+                       "then the follow-up skill", "use the built-in skill", "the shared well-known skill")
+        self.assertEqual(r.returncode, 0, r.stderr.decode())
+
+    def test_skill_phrase_needs_the(self):
+        r = self.skill("save a no-such-thing skill later")
+        self.assertEqual(r.returncode, 0, r.stderr.decode())
+        for step in ("The no-such-thing skill", "run the shared no-such-thing skill"):
+            with self.subTest(step):
+                r = self.skill(step)
+                self.assertEqual(r.returncode, 2)
+                self.assertIn("no-such-thing", r.stderr.decode())
+
     def test_without_root_nothing_is_checked(self):
         r = botkit("skill", "--purpose", "p", "--step", "follow the no-such-thing skill")
         self.assertEqual(r.returncode, 0)
@@ -419,6 +442,26 @@ class SkillsTest(unittest.TestCase):
                 front = text.split("---\n", 2)[1]
                 self.assertIn(f"name: {path.parent.name}\n", front)
                 self.assertRegex(front, r"(?m)^description: ")
+
+    def test_shipped_docs_name_only_skills_and_files_that_exist(self):
+        sys.path.insert(0, str(ROOT))
+        self.addCleanup(sys.path.remove, str(ROOT))
+        import botkit as bk
+        docs = [ROOT / "AGENTS.md", ROOT / "README.md", *sorted((ROOT / "skills").glob("*/SKILL.md")),
+                *sorted((ROOT / "routines").glob("*.md"))]
+        clone_path = re.compile(r"ROOT/botkit/([^\s`'\"(),;:{}<>$]+)")
+        for doc in docs:
+            text = doc.read_text(encoding="utf-8")
+            names = set(bk.SKILL_PATH.findall(text)) | (set(bk.SKILL_PHRASE.findall(text)) - bk.NOT_SKILL_NAMES)
+            for name in sorted(names):
+                with self.subTest(doc=doc.name, skill=name):
+                    self.assertTrue((ROOT / "skills" / name / "SKILL.md").is_file())
+            for rel in sorted(set(clone_path.findall(text))):
+                rel = rel.rstrip(".")
+                if "*" in rel:
+                    continue
+                with self.subTest(doc=doc.name, path=rel):
+                    self.assertTrue((ROOT / rel).exists())
 
 
 if __name__ == "__main__":
