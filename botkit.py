@@ -200,12 +200,15 @@ def render(kind, data):
 def _load_json(path):
     try:
         if path == "-":
-            data = json.load(sys.stdin)
+            raw = sys.stdin.buffer.read()
         else:
-            with open(path, encoding="utf-8") as fh:
-                data = json.load(fh)
+            with open(path, "rb") as fh:
+                raw = fh.read()
+        data = json.loads(raw.decode("utf-8"))
     except OSError as e:
-        raise BotkitError(f"cannot read {path}: {e.strerror}")
+        raise BotkitError(f"cannot read {path}: {e.strerror or e}")
+    except UnicodeDecodeError:
+        raise BotkitError(f"{path}: not UTF-8 text")
     except json.JSONDecodeError as e:
         raise BotkitError(f"{path}: invalid JSON: {e}")
     if not isinstance(data, dict):
@@ -216,8 +219,11 @@ def _load_json(path):
 def _write(text, out):
     data = text.encode("utf-8")
     if out:
-        with open(out, "wb") as fh:
-            fh.write(data)
+        try:
+            with open(out, "wb") as fh:
+                fh.write(data)
+        except OSError as e:
+            raise BotkitError(f"cannot write {out}: {e.strerror or e}")
     else:
         sys.stdout.buffer.write(data)
         sys.stdout.buffer.flush()
@@ -283,6 +289,8 @@ def cmd_init(args):
         except FileExistsError:
             print(f"skip {dest} (exists)")
             continue
+        except OSError as e:
+            raise BotkitError(f"cannot write {dest}: {e.strerror or e}")
         print(f"create {dest}")
     print(
         "\nNext steps:\n"
