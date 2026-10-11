@@ -281,39 +281,43 @@ def render_evals(data):
 
 SKILL_PATH = re.compile(r"(?<![\w.-])skills/([a-z0-9]+(?:-[a-z0-9]+)*)")
 SKILL_PHRASE = re.compile(r"\b[Tt]he (?:shared )?([a-z0-9]+(?:-[a-z0-9]+)+) skill\b")
-# Hyphenated modifiers that read as "the <adjective> skill", not a skill's name.
-NOT_SKILL_NAMES = frozenset((
-    "built-in", "follow-up", "high-level", "long-running", "low-level", "one-off",
-    "read-only", "same-day", "step-by-step", "top-level", "up-to-date", "well-known",
-))
 REFERENCE_PATH = re.compile(r"(?<![\w.-])references/([^\s`'\"(),;:{}<>]+)")
 
 
 def check_links(kind, data, root):
-    """Fail if an item names a skill folder or references/ file missing under root.
+    """Fail if an item names a skills/<name> folder or references/ file missing under root.
 
     Skills are found at ROOT/skills/<name>/SKILL.md or ROOT/botkit/skills/<name>/SKILL.md;
-    references at ROOT/references/<file>.
+    references at ROOT/references/<file>. A "the <name> skill" phrase can't be told apart
+    from "the <adjective> skill", so an unknown one is only returned as a warning.
     """
     root = Path(root)
     if not root.is_dir():
         raise BotkitError(f"--root {root} is not a directory")
+
+    def exists(name):
+        return any((base / "skills" / name / "SKILL.md").is_file() for base in (root, root / "botkit"))
+
+    warnings = []
     f = normalize(kind, data)
     for key in ("purpose", "input", "questions", "steps", "decide", "thresholds", "jev_down", "run", "never"):
         for n, item in enumerate(f.get(key, []), 1):
             where = f"field '{key}' item {n}"
-            names = set(SKILL_PATH.findall(item)) | (set(SKILL_PHRASE.findall(item)) - NOT_SKILL_NAMES)
-            for name in sorted(names):
-                if not any((base / "skills" / name / "SKILL.md").is_file()
-                           for base in (root, root / "botkit")):
+            for name in sorted(set(SKILL_PATH.findall(item))):
+                if not exists(name):
                     raise BotkitError(
-                        f"{where} names skill '{name}', but there is no {name}/SKILL.md "
+                        f"{where} names skills/{name}, but there is no {name}/SKILL.md "
                         f"under {root / 'skills'} or {root / 'botkit' / 'skills'}"
                     )
+            for name in sorted(set(SKILL_PHRASE.findall(item))):
+                if not exists(name):
+                    warnings.append(f"{where} says 'the {name} skill', but there is no skill '{name}'; "
+                                    f"if it's a skill, write skills/{name}")
             for ref in sorted(set(REFERENCE_PATH.findall(item))):
                 ref = ref.rstrip(".")
                 if ".." in ref.split("/") or not (root / "references" / ref).is_file():
                     raise BotkitError(f"{where} names references/{ref}, but {root / 'references' / ref} does not exist")
+    return warnings
 
 
 def render(kind, data):
@@ -395,9 +399,12 @@ def cmd_generate(args):
     else:
         data = flags
     text = render(kind, data)
+    warnings = []
     if getattr(args, "root", None) is not None:
-        check_links(kind, data, args.root)
+        warnings = check_links(kind, data, args.root)
     _write(text, args.out)
+    for w in warnings:
+        print(f"botkit: warning: {w}", file=sys.stderr)
     return 0
 
 
@@ -426,8 +433,8 @@ def build_parser():
         if kind != "profile":
             sp.add_argument(
                 "--root", metavar="DIR",
-                help="fail if an item names a skill (skills/<name> or 'the <name> skill') or a "
-                     "references/<file> missing under DIR (skills also found in DIR/botkit/skills)")
+                help="fail if an item names a skills/<name> or references/<file> missing under DIR "
+                     "(skills also found in DIR/botkit/skills); warn on an unknown 'the <name> skill'")
         for f in spec:
             sp.add_argument(*f.flags, dest=f.key, action="append", metavar="TEXT", help=f.help)
         sp.set_defaults(func=cmd_generate)

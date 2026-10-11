@@ -370,13 +370,13 @@ class LinkCheckTest(unittest.TestCase):
                                           "--step", "open ROOT/references/runbook.md.",
                                           "--step", "read references/{file} as listed").stdout)
 
-    def test_missing_skill_fails(self):
-        for step in ("follow the design-a-grok-bot skill", "read skills/evaluate-a-grok-bot/SKILL.md"):
+    def test_missing_skill_path_fails(self):
+        for step in ("read skills/evaluate-a-grok-bot/SKILL.md", "follow skills/design-a-grok-bot"):
             with self.subTest(step):
                 r = self.skill("first", step)
                 self.assertEqual(r.returncode, 2)
                 self.assertEqual(r.stdout, b"")
-                self.assertIn("field 'steps' item 2 names skill", r.stderr.decode())
+                self.assertIn("field 'steps' item 2 names skills/", r.stderr.decode())
 
     def test_missing_reference_fails(self):
         r = self.skill("read references/missing.md")
@@ -386,23 +386,27 @@ class LinkCheckTest(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
 
     def test_jev_skill_checked_too(self):
-        r = self.skill("follow the no-such-thing skill", kind="jev-skill")
+        r = self.skill("read skills/no-such-thing/SKILL.md", kind="jev-skill")
         self.assertEqual(r.returncode, 2)
         self.assertIn("no-such-thing", r.stderr.decode())
 
-    def test_hyphenated_modifiers_are_not_skill_names(self):
-        r = self.skill("pick a follow-up skill if one fits", "write a well-known skill down",
-                       "then the follow-up skill", "use the built-in skill", "the shared well-known skill")
+    def test_unknown_skill_phrase_only_warns(self):
+        steps = ("then the follow-up skill", "use the hands-on skill", "The no-such-thing skill",
+                 "run the shared cross-check skill")
+        r = self.skill(*steps)
         self.assertEqual(r.returncode, 0, r.stderr.decode())
+        self.assertEqual(r.stdout, botkit("skill", "--purpose", "p",
+                                          *[a for s in steps for a in ("--step", s)]).stdout)
+        warnings = r.stderr.decode().splitlines()
+        self.assertEqual(len(warnings), 4, warnings)
+        for line, name in zip(warnings, ("follow-up", "hands-on", "no-such-thing", "cross-check")):
+            self.assertTrue(line.startswith("botkit: warning: "), line)
+            self.assertIn(f"write skills/{name}", line)
 
-    def test_skill_phrase_needs_the(self):
-        r = self.skill("save a no-such-thing skill later")
-        self.assertEqual(r.returncode, 0, r.stderr.decode())
-        for step in ("The no-such-thing skill", "run the shared no-such-thing skill"):
-            with self.subTest(step):
-                r = self.skill(step)
-                self.assertEqual(r.returncode, 2)
-                self.assertIn("no-such-thing", r.stderr.decode())
+    def test_known_or_indefinite_skill_phrase_is_silent(self):
+        r = self.skill("follow the bot-references skill", "save a no-such-thing skill later")
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stderr, b"")
 
     def test_without_root_nothing_is_checked(self):
         r = botkit("skill", "--purpose", "p", "--step", "follow the no-such-thing skill")
@@ -415,9 +419,10 @@ class LinkCheckTest(unittest.TestCase):
 
     def test_repo_skills_resolve_against_repo(self):
         r = botkit("skill", "--root", ROOT, "--purpose", "p",
-                   "--step", "follow the evaluate-a-grok-bot skill",
+                   "--step", "follow skills/evaluate-a-grok-bot/SKILL.md",
                    "--step", "then the bot-safety-check skill")
         self.assertEqual(r.returncode, 0, r.stderr.decode())
+        self.assertEqual(r.stderr, b"")
 
 
 class CommandsTest(unittest.TestCase):
@@ -452,7 +457,7 @@ class SkillsTest(unittest.TestCase):
         clone_path = re.compile(r"ROOT/botkit/([^\s`'\"(),;:{}<>$]+)")
         for doc in docs:
             text = doc.read_text(encoding="utf-8")
-            names = set(bk.SKILL_PATH.findall(text)) | (set(bk.SKILL_PHRASE.findall(text)) - bk.NOT_SKILL_NAMES)
+            names = set(bk.SKILL_PATH.findall(text)) | set(bk.SKILL_PHRASE.findall(text))
             for name in sorted(names):
                 with self.subTest(doc=doc.name, skill=name):
                     self.assertTrue((ROOT / "skills" / name / "SKILL.md").is_file())
@@ -462,6 +467,14 @@ class SkillsTest(unittest.TestCase):
                     continue
                 with self.subTest(doc=doc.name, path=rel):
                     self.assertTrue((ROOT / rel).exists())
+
+    def test_handover_list_names_every_shared_skill(self):
+        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        section = re.search(r"(?ms)^### Handing skills to other bots\n(.*?)(?=^#)", text).group(1)
+        listed = []
+        for names in re.findall(r"(?m)^- ([a-z0-9-]+(?:, [a-z0-9-]+)*): ", section):
+            listed += names.split(", ")
+        self.assertEqual(sorted(listed), sorted(p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")))
 
 
 if __name__ == "__main__":
