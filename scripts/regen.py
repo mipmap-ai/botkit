@@ -4,6 +4,7 @@
   examples/profiles/<bot>.json -> examples/profiles/<bot>.md  (profile)
   examples/evals/<bot>.json    -> examples/evals/<bot>.md     (evals)
   tests/golden/<kind>*.json    -> tests/golden/<kind>*.md     (kind from file name)
+  skills/<name>/skill.json     -> skills/<name>/SKILL.md      (skill; shared skills without one are hand-written)
 
 With --check, write nothing and exit 1 if any file differs.
 Every file must put exactly one blank line between sections, so a profile
@@ -35,6 +36,8 @@ def targets():
     inputs += sorted((ROOT / "tests" / "golden").glob("*.json"))
     for src in inputs:
         yield src, src.with_suffix(".md"), kind_for(src)
+    for src in sorted((ROOT / "skills").glob("*/skill.json")):
+        yield src, src.with_name("SKILL.md"), "skill"
 
 
 HEADER = re.compile(r"^[A-Z][A-Za-z]*:$")

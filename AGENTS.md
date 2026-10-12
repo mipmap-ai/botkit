@@ -7,11 +7,11 @@ A Grok Bot is a long-running AI agent; its profile is its whole persona. All of 
 ## Always generate with botkit
 
 - Profiles, skills and eval scenarios come from `python3 botkit.py profile|skill|jev-skill|evals`. Never write them freehand. Those four commands are all botkit does; installing is the steps below.
-- Never hand-edit generated output: `examples/profiles/*.md`, `examples/evals/*.md`, `tests/golden/*.md`, or a profile on a live bot. Change the JSON input (or the flags), then regenerate.
+- Never hand-edit generated output: `examples/profiles/*.md`, `examples/evals/*.md`, `tests/golden/*.md`, a `skills/<name>/SKILL.md` beside a `skill.json`, or a profile on a live bot. Change the JSON input (or the flags), then regenerate.
 - JSON keys are plural field names (`responsibilities`); flags are singular (`--responsibility`), repeated per item.
-- After changing `botkit.py` or any `*.json` input under `examples/profiles/`, `examples/evals/` or `tests/golden/`, run `python3 scripts/regen.py` and commit the results. CI fails on stale output.
+- After changing `botkit.py`, any `*.json` input under `examples/profiles/`, `examples/evals/` or `tests/golden/`, or a `skills/<name>/skill.json`, run `python3 scripts/regen.py` and commit the results. CI fails on stale output.
 - Keep `templates/*.md` in step with `botkit.py`; a test compares their section headers.
-- Hand-written files: `botkit.py`, `templates/`, `skills/`, `routines/`, `examples/safety/` (program, config, cases), docs, tests.
+- Hand-written files: `botkit.py`, `templates/`, `skills/` (except a `SKILL.md` generated from its `skill.json`), `routines/`, `examples/safety/` (program, config, cases), docs, tests.
 
 ## Installing botkit on a bot computer
 
@@ -28,7 +28,7 @@ ROOT/
   safety/              your safety check programs (optional)
   safety/tests/        unittest suite for them (optional, instead of cases files)
   references/          reference files plus INDEX.md (optional)
-  avatars/<name>.png   each bot's picture (design-a-grok-bot)
+  avatars/<name>.png   each bot's picture (create-avatar)
   avatars/<name>.url   its botbuilder share link
 ```
 
@@ -37,7 +37,7 @@ The fleet file is `ROOT/fleet.json` unless `BOTKIT_FLEET` names another path; `b
 Follow these steps in order. Do each one yourself; ask the owner only where a step says to.
 
 1. **Get the repo.** If `ROOT/botkit` doesn't exist, run `git clone https://github.com/mipmap-ai/botkit ROOT/botkit`. If it exists and is a botkit checkout (`git -C ROOT/botkit remote get-url origin` ends in `botkit` or `botkit.git`, and `ROOT/botkit/botkit.py` exists), run `git -C ROOT/botkit pull --ff-only`. If it exists but isn't a botkit checkout, stop: don't move, delete or overwrite it; tell the owner what's there and ask what to do. Check that `python3 --version` is 3.10 or newer.
-2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md` (bot-references, bot-safety-check, cost-review, design-a-grok-bot, evaluate-a-grok-bot), in name order, follow "Saving one botkit skill" below. On Grok Bot this saves them for every bot; only with per-bot skill stores do other bots get theirs through "Handing skills to other bots".
+2. **Save the shared skills.** For each `ROOT/botkit/skills/<folder>/SKILL.md` (bot-references, bot-safety-check, cost-review, create-avatar, design-a-grok-bot, evaluate-a-grok-bot), in name order, follow "Saving one botkit skill" below. On Grok Bot this saves them for every bot; only with per-bot skill stores do other bots get theirs through "Handing skills to other bots".
 3. **Create the fleet file.** If the owner already keeps a fleet file elsewhere, set `BOTKIT_FLEET` to its path and create nothing. Otherwise, if `ROOT/fleet.json` doesn't exist, copy `ROOT/botkit/examples/fleet.example.json` to it. If it exists, leave it untouched. Then, with the owner, replace the three sample bots with the real ones.
 4. **Create the bots and avatars folders.** Make `ROOT/bots/` and `ROOT/avatars/` if they're missing. Each bot's input lives at `ROOT/bots/<name>.json`; its picture at `ROOT/avatars/<name>.png`, with the site's share link in `ROOT/avatars/<name>.url`.
 5. **Safety check (optional, only for bots with risky actions).** Make `ROOT/safety/` if it's missing. Copy `ROOT/botkit/examples/safety/inbound-check`, `inbound-check.json` and `inbound-check.cases.json` into it only if they're missing, and keep `inbound-check` executable. Adapt `inbound-check.json` (allow list, block list, risky words) and its cases with the owner. Run its safety tests as in "Safety check programs" below; all must pass before any profile points at it.
@@ -84,7 +84,7 @@ Skip this section when skills are shared across bots, the Grok Bot default: inst
 - bot-safety-check: every bot whose profile has `Safety:`.
 - bot-references: every bot whose profile has `References:`.
 - cost-review: every bot that creates or changes its own routines.
-- design-a-grok-bot, evaluate-a-grok-bot: only the bot that designs and evaluates bots (you).
+- create-avatar, design-a-grok-bot, evaluate-a-grok-bot: only the bot that designs and evaluates bots (you).
 
 To hand a skill over, message the bot with the skill name, the full `SKILL.md` content in a code block, and the instruction: save it through your skill tool under that name, following botkit's "Saving one botkit skill" (save if missing, skip if identical, ask your owner Replace, Merge or Skip if different), then reply with the note. In the update steps, also give the `$OLD` commit, so a bot whose copy matches botkit's previous version (readable from the shared `ROOT/botkit`) updates without asking. Confirm to the owner what you sent and each bot's reply. If sending fails, say so and give the owner the one-line instruction to paste into that bot.
 
@@ -112,7 +112,7 @@ python3 scripts/run_safety_cases.py
 python3 scripts/public_safety_scan.py
 ```
 
-This repo is public. No real names, emails, phone numbers, account IDs, org or repo names other than botkit, hostnames, avatar sites or personal paths. Use neutral placeholders (`owner`, `inbox-bot`, `ROOT`). Exceptions: botkit's own repo URL (`https://github.com/mipmap-ai/botkit`, including its org name); the public avatar site `https://botbuilder.mipmap.ai/` used by design-a-grok-bot; and third-party projects botkit adapts or builds on (pstack and its skills), named in shared skills and credited with their license in the README's Credits section.
+This repo is public. No real names, emails, phone numbers, account IDs, org or repo names other than botkit, hostnames, avatar sites or personal paths. Use neutral placeholders (`owner`, `inbox-bot`, `ROOT`). Exceptions: botkit's own repo URL (`https://github.com/mipmap-ai/botkit`, including its org name); the public avatar site `https://botbuilder.mipmap.ai/` and its MCP server, used by create-avatar; and third-party projects botkit adapts or builds on (pstack and its skills), named in shared skills and credited with their license in the README's Credits section.
 
 ## Writing profile fields
 
