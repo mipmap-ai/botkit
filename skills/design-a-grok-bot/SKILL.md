@@ -105,11 +105,12 @@ The bar is pstack. Read pstack's poteto-mode when writing the profile: one purpo
 
 ## Avatar (every new bot)
 
-Right after create, without asking, give the bot a picture from https://botbuilder.mipmap.ai/. These steps follow the site's current interface; if the UI differs, use its equivalent controls.
+Right after create, without asking, give the bot a picture from https://botbuilder.mipmap.ai/. Open the site in the desktop browser and prefer its WebMCP tools; only if they're unavailable, use the site UI.
 
-- In the desktop browser: open the site, press Randomize, open the right panel's Frame tab and set it to Centered (Randomize also randomizes Frame into cropped poses), then click `2x / Download PNG 2048 x 2048`. Save it to `ROOT/avatars/<bot-name>.png`. Look at it.
-- Broken (garbled, blank, cut off): randomize again, up to 3 tries.
-- A bot can only set its own picture: message the new bot with the image attached; tell it to set it as its avatar (Grok Bot: `UpdateAvatar`) and confirm.
+- Tools: `randomize_bot`; `get_bot_options` for valid values, then `change_bot` to set Frame to Centered (randomizing also picks cropped Frame poses); `undo`/`redo` to step back; photo match only when the owner gives a reference photo. `export_bot` with format `png`, size `2048`; save it to `ROOT/avatars/<bot-name>.png`. `get_bot_share_link`; save the link to `ROOT/avatars/<bot-name>.url`.
+- UI fallback: press Randomize, set the right panel's Frame tab to Centered, click `2x / Download PNG 2048 x 2048`; copy the share link from the page. If the UI differs, use its equivalent controls.
+- Look at it. Broken (garbled, blank, cut off) or too like another bot's picture in `ROOT/avatars/`: randomize again, up to 3 tries.
+- A bot can only set its own picture: message the new bot with the PNG attached; tell it to set it as its avatar (Grok Bot: `UpdateAvatar`) and confirm.
 - Show the owner the image in the create message; regenerate if they dislike it.
 
 ## After create
