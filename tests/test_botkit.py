@@ -663,9 +663,12 @@ class DocsTest(unittest.TestCase):
         self.assertIn('"Avatar (every new bot)"', section(design, "## After create"))
         avatar = section(design, "## Avatar (every new bot)")
         for needle in ("Randomize", "Centered", "2048 x 2048", "ROOT/avatars/<bot-name>.png",
-                       "up to 3 tries", "UpdateAvatar"):
+                       "up to 3 tries", "UpdateAvatar", "`randomize_bot`", "`get_bot_options`",
+                       "`change_bot`", "`export_bot`", "size `2048`", "`get_bot_share_link`",
+                       "`undo`/`redo`", "photo match", "ROOT/avatars/<bot-name>.url",
+                       "too like another bot's picture", "only if they're unavailable, use the site UI"):
             self.assertIn(needle, avatar)
-        self.assertIn("if the UI differs, use its equivalent controls", avatar)
+        self.assertIn("If the UI differs, use its equivalent controls", avatar)
         install = re.search(r"(?m)^4\. \*\*Create the bots and avatars folders\.\*\*.*$", read("AGENTS.md")).group(0)
         self.assertIn("`ROOT/avatars/`", install)
 
