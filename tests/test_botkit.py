@@ -664,11 +664,15 @@ class DocsTest(unittest.TestCase):
         avatar = section(design, "## Avatar (every new bot)")
         for needle in ("Randomize", "Centered", "2048 x 2048", "ROOT/avatars/<bot-name>.png",
                        "up to 3 tries", "UpdateAvatar", "`randomize_bot`", "`get_bot_options`",
-                       "`change_bot`", "`export_bot`", "size `2048`", "`get_bot_share_link`",
-                       "`undo`/`redo`", "photo match", "ROOT/avatars/<bot-name>.url",
-                       "too like another bot's picture", "only if they're unavailable, use the site UI"):
+                       '`change_bot` with `{"selections": {"frame": "front-center"}}`',
+                       '`export_bot` with `{"format": "png", "size": 2048}`', "`get_bot_share_link`",
+                       "`undo_bot`/`redo_bot`", "ROOT/avatars/<bot-name>.url",
+                       "too like another bot's picture", "else the UI", "If the UI differs, use its equivalent controls"):
             self.assertIn(needle, avatar)
-        self.assertIn("If the UI differs, use its equivalent controls", avatar)
+        self.assertNotRegex(avatar, r"`(undo|redo)`")
+        auto = avatar[:avatar.index("- Show the owner")]
+        self.assertNotIn("photo", auto)
+        self.assertIn("only with the owner present to pick a photo", avatar)
         install = re.search(r"(?m)^4\. \*\*Create the bots and avatars folders\.\*\*.*$", read("AGENTS.md")).group(0)
         self.assertIn("`ROOT/avatars/`", install)
 
