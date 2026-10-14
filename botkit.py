@@ -25,13 +25,14 @@ class BotkitError(Exception):
 
 
 class Field:
-    def __init__(self, key, label, flags, required=False, scalar=False, help=""):
+    def __init__(self, key, label, flags, required=False, scalar=False, help="", default=None):
         self.key = key
         self.label = label
         self.flags = flags
         self.required = required
         self.scalar = scalar
         self.help = help
+        self.default = default
 
 
 SKILL_HEAD = [
@@ -44,7 +45,15 @@ SKILL_HEAD = [
     Field("input", "Input", ["--input"], help="what it starts from (repeatable)"),
 ]
 
+CONFIRM = Field(
+    "confirm", "Confirm", ["--confirm"],
+    help="conditional decision confirmation rule (repeatable)",
+    default="when a decision or possible decision appears, show the decision card with the "
+            "multiple-choice options; wait for a yes before doing anything",
+)
+
 SKILL_TAIL = [
+    CONFIRM,
     Field("run", "Run", ["--run"], help="exact command (repeatable)"),
     Field("never", "Never", ["--never"],
           help="hard limit not already enforced by a Safety program (repeatable)"),
@@ -66,6 +75,7 @@ SPECS = {
               help="bare reference file name (repeatable; omitted when empty)"),
         Field("voice", "Voice", ["--voice"], required=True,
               help="a few words (repeatable)"),
+        CONFIRM,
     ],
     "skill": SKILL_HEAD + [
         Field("steps", "Steps", ["--step", "--steps"], required=True,
@@ -126,7 +136,7 @@ def normalize(kind, data):
         )
     fields = {}
     for f in spec:
-        fields[f.key] = _items(f, data.get(f.key))
+        fields[f.key] = _items(f, data.get(f.key, f.default))
     missing = [f.key for f in spec if f.required and not fields[f.key]]
     if missing:
         raise BotkitError(f"missing required field(s) for {kind}: {', '.join(missing)}")
@@ -381,7 +391,7 @@ def render(kind, data):
         decide += f["thresholds"] + [f"Jev down (exit 2): {f['jev_down'][0]}"]
     if decide:
         blocks.append(_section("Decide", decide))
-    for key, label in (("run", "Run"), ("never", "Never")):
+    for key, label in (("confirm", "Confirm"), ("run", "Run"), ("never", "Never")):
         if f[key]:
             blocks.append(_section(label, f[key]))
     body = "\n\n".join("\n".join(b) for b in blocks) + "\n"

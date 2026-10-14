@@ -25,6 +25,9 @@ Decide:
 - tone hostile: never list
 - Jev down (exit 2): list nothing; report Jev down once
 
+Confirm:
+- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything
+
 Run:
 - jev ask --questions mention-scout.questions --input {mention}
 
