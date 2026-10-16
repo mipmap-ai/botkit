@@ -131,18 +131,15 @@ The bar is pstack. Read pstack's poteto-mode when writing the profile: one purpo
 
 ## Avatar (every new bot)
 
-Right after create, without asking, give the bot a picture from https://botbuilder.mipmap.ai/ in the desktop browser. Use its WebMCP tools if the browser exposes them; else the UI, which many browsers need. Either way, end with `ROOT/avatars/<bot-name>.png` (2048 PNG) and its share link in `ROOT/avatars/<bot-name>.url`.
+Right after create, without asking, follow `skills/create-avatar/SKILL.md` for the new bot. It ends with `ROOT/avatars/<bot-name>.png` (2048 PNG), its share link in `ROOT/avatars/<bot-name>.url`, and the new bot setting the picture with `UpdateAvatar`.
 
-- Tools: `randomize_bot`; then `change_bot` with `{"selections": {"frame": "front-center"}}` (the Centered frame; randomizing picks cropped frames; confirm the ID in `get_bot_options`, and skip this if it's gone). `undo_bot`/`redo_bot` step back. `export_bot` with `{"format": "png", "size": 2048}`; move the downloaded file it names to the `.png` path. `get_bot_share_link` returns `url`; write it to the `.url` file.
-- UI: press Randomize, set the right panel's Frame tab to Centered, click `2x / Download PNG 2048 x 2048`, copy the share link from the page. If the UI differs, use its equivalent controls.
-- Look at it. Broken (garbled, blank, cut off) or too like another bot's picture in `ROOT/avatars/`: randomize again, up to 3 tries.
-- A bot can only set its own picture: message the new bot with the PNG attached; tell it to set it as its avatar (Grok Bot: `UpdateAvatar`) and confirm.
-- Show the owner the image in the create message; regenerate if they dislike it. Optional, only with the owner present to pick a photo: photo match (`open_photo_match` opens a file picker, then `match_selected_photo`, poll `get_photo_match_status`, read `get_current_bot`), then export and save as above.
+- Show the owner the image in the create message; regenerate with `skills/create-avatar/SKILL.md` if they dislike it, passing any picks they name.
+- Optional, only with the owner present to pick a photo: photo match in the desktop browser on https://botbuilder.mipmap.ai/ (`open_photo_match` opens a file picker, then `match_selected_photo`, poll `get_photo_match_status`, read `get_current_bot`); pass its selections as picks to `skills/create-avatar/SKILL.md`.
 
 ## After create
 
 1. Read the live profile back and compare it with the generated `.md`; don't trust the tool's acknowledgement. Tell the owner the name and the Purpose lines.
-2. Make and hand over its avatar as in "Avatar (every new bot)"; show it in the same message.
+2. Make and hand over its avatar as in "Avatar (every new bot)" (`skills/create-avatar/SKILL.md`); show it in the same message.
 3. Skip this step when skills are shared across bots (Grok Bot default). Only with per-bot skill stores, hand the new bot the shared skills the "Handing skills to other bots" list in `ROOT/botkit/AGENTS.md` gives it: bot-safety-check if its profile has `Safety:`, bot-references if it has `References:`, cost-review if it will create or change its own routines. Without them it ignores those lines. Follow that section to send them and confirm the replies to the owner.
 4. Write 6-30 scenarios (start near 10) in `ROOT/evals/<name>.json` and run them with the evaluate-a-grok-bot skill before the bot goes live; re-run after every profile or skill change.
 5. Check its fleet-file line (added before generating): run the fleet check if there is one, and one test route with a typical ask to confirm the router picks the new bot. When its purpose changes, update the line too.

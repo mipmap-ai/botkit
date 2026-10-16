@@ -603,8 +603,8 @@ class SkillsTest(unittest.TestCase):
     def test_each_skill_named_after_its_folder(self):
         skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
         self.assertEqual([p.parent.name for p in skills],
-                         ["bot-references", "bot-safety-check", "cost-review", "design-a-grok-bot",
-                          "evaluate-a-grok-bot"])
+                         ["bot-references", "bot-safety-check", "cost-review", "create-avatar",
+                          "design-a-grok-bot", "evaluate-a-grok-bot"])
         for path in skills:
             with self.subTest(path.parent.name):
                 text = path.read_text(encoding="utf-8")
@@ -697,19 +697,37 @@ class DocsTest(unittest.TestCase):
             self.assertIn(f"\n{heading}\n", design)
         self.assertIn('"Avatar (every new bot)"', section(design, "## After create"))
         avatar = section(design, "## Avatar (every new bot)")
-        for needle in ("Randomize", "Centered", "2048 x 2048", "ROOT/avatars/<bot-name>.png",
-                       "up to 3 tries", "UpdateAvatar", "`randomize_bot`", "`get_bot_options`",
-                       '`change_bot` with `{"selections": {"frame": "front-center"}}`',
-                       '`export_bot` with `{"format": "png", "size": 2048}`', "`get_bot_share_link`",
-                       "`undo_bot`/`redo_bot`", "ROOT/avatars/<bot-name>.url",
-                       "too like another bot's picture", "else the UI", "If the UI differs, use its equivalent controls"):
+        for needle in ("follow `skills/create-avatar/SKILL.md`", "ROOT/avatars/<bot-name>.png",
+                       "ROOT/avatars/<bot-name>.url", "UpdateAvatar"):
             self.assertIn(needle, avatar)
-        self.assertNotRegex(avatar, r"`(undo|redo)`")
+        for gone in ("`randomize_bot`", "`export_bot`", "Centered", "up to 3"):
+            self.assertNotIn(gone, avatar)
         auto = avatar[:avatar.index("- Show the owner")]
         self.assertNotIn("photo", auto)
         self.assertIn("only with the owner present to pick a photo", avatar)
         install = re.search(r"(?m)^4\. \*\*Create the bots and avatars folders\.\*\*.*$", read("AGENTS.md")).group(0)
         self.assertIn("`ROOT/avatars/`", install)
+
+    def test_create_avatar_handles_botbuilder_quirks(self):
+        sys.path.insert(0, str(ROOT))
+        self.addCleanup(sys.path.remove, str(ROOT))
+        import botkit as bk
+        src = ROOT / "skills" / "create-avatar" / "skill.json"
+        self.assertEqual(bk.render("skill", bk._load_json(str(src))), read("skills/create-avatar/SKILL.md"))
+        skill = read("skills/create-avatar/SKILL.md")
+        steps = section(skill, "Steps:")
+        for needle in ("randomize_bot", "create_bot", '"frame": "front-center"', "set frame to front-center",
+                       "delete every key named in unavailableFields", "delete size", "up to 3 rerolls",
+                       "same character or same accessory", '"format": "png", "size": 2048',
+                       "strip that parameter", "ROOT/avatars/<bot>.png", "2048 x 2048",
+                       "ROOT/avatars/<bot>.url", "UpdateAvatar"):
+            self.assertIn(needle, steps)
+        self.assertIn("https://botbuilder.mipmap.ai/mcp", section(skill, "Run:"))
+        self.assertIn("Accept: application/json, text/event-stream", section(skill, "Run:"))
+        fallback = re.search(r"(?m)^- server down.*$", section(skill, "Decide:")).group(0)
+        self.assertIn("fallback only", fallback)
+        self.assertIn("WebMCP", fallback)
+        self.assertIn("use the browser path while the MCP server works", section(skill, "Never:"))
 
     def test_coding_bot_sizing(self):
         sizing = re.search(r"(?m)^- Sizing: .*$", section(read("skills/design-a-grok-bot/SKILL.md"),

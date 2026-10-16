@@ -128,7 +128,7 @@ python3 botkit.py jev-skill --name mention-scout \
 
 That prints the same bytes as `python3 botkit.py jev-skill --json tests/golden/jev-skill.json` (in JSON the Jev-down field is `jev_down`).
 
-`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a `skills/<name>` or `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`). Only the skill you're generating is checked. Name other skills by path; a phrase like `the <name> skill` with an unknown name only prints a warning (the "name" may really be an adjective such as follow-up) and still exits 0. The shared skills in `skills/` are hand-written; a test checks in CI that they, the routines and the docs name only skills and `ROOT/botkit/` files that exist in the repo.
+`skill` and `jev-skill` also take `--root DIR`: the command fails if an item names a `skills/<name>` or `references/<file>` that doesn't exist under `DIR` (skills are also looked up in `DIR/botkit/skills`). Only the skill you're generating is checked. Name other skills by path; a phrase like `the <name> skill` with an unknown name only prints a warning (the "name" may really be an adjective such as follow-up) and still exits 0. The shared skills in `skills/` are hand-written, except create-avatar, whose `SKILL.md` is generated from `skills/create-avatar/skill.json` (`python3 botkit.py skill --root . --json skills/create-avatar/skill.json`; `scripts/regen.py` keeps it current). A test checks in CI that they, the routines and the docs name only skills and `ROOT/botkit/` files that exist in the repo.
 
 ```sh
 python3 botkit.py skill --root . --purpose "check a new bot" --step "follow skills/evaluate-a-grok-bot/SKILL.md"
@@ -163,7 +163,7 @@ Run `python3 botkit.py <command> --help` for every flag.
 | --- | --- |
 | `botkit.py` | the CLI |
 | `templates/` | the profile, skill, Jev skill and evals layouts (`profile.md`, `skill.md`, `jev-skill.md`, `evals.md`) |
-| `skills/` | shared skills: designing a bot, evaluating a bot, reviewing token cost, running safety checks, reading references |
+| `skills/` | shared skills: designing a bot, making its avatar, evaluating a bot, reviewing token cost, running safety checks, reading references |
 | `examples/` | `fleet.example.json`, three sample bots (JSON input and generated `.md` profile), inbox-bot's eval scenarios, and the `inbound-check` safety check with its cases |
 | `routines/` | copyable routine prompts |
 | `scripts/run_safety_cases.py` | runs safety-check cases files |
@@ -191,9 +191,9 @@ python3 scripts/run_safety_cases.py
 python3 scripts/public_safety_scan.py
 ```
 
-After changing `botkit.py` or any example or golden JSON input, run `python3 scripts/regen.py` and commit the regenerated files. CI runs the tests, the regen check and the safety cases on Python 3.10 to 3.13, plus the public-safety scan.
+After changing `botkit.py`, any example or golden JSON input, or a `skills/<name>/skill.json`, run `python3 scripts/regen.py` and commit the regenerated files. CI runs the tests, the regen check and the safety cases on Python 3.10 to 3.13, plus the public-safety scan.
 
-This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them. The only other names and links allowed are botkit's own repo, the public avatar site `https://botbuilder.mipmap.ai/`, and the third-party projects credited below with their license (pstack, which the shared skills also name).
+This repo is public. Don't commit names, contact details, account IDs, hostnames or personal paths; the scan catches the common cases, not all of them. The only other names and links allowed are botkit's own repo, the public avatar site `https://botbuilder.mipmap.ai/` (whose MCP server create-avatar calls), and the third-party projects credited below with their license (pstack, which the shared skills also name).
 
 ## Credits
 

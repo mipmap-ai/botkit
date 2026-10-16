@@ -1,0 +1,42 @@
+---
+name: create-avatar
+description: "Use when a new bot needs a picture: make a Bot Builder avatar through its MCP server with curl, save the 2048 PNG and share link in ROOT/avatars, have the bot set it."
+---
+Purpose:
+- give a bot a front-facing Bot Builder avatar unlike the others in ROOT/avatars
+
+Input:
+- bot name (file stem in ROOT/avatars)
+- optional picks: option IDs from get_bot_options
+- existing share links: ROOT/avatars/*.url
+
+Steps:
+- 1. from each ROOT/avatars/*.url query take character (missing = bot) and accessory (missing = none)
+- 2. no picks: call randomize_bot with {}; picks: call create_bot with {"selections": {<picks>, "frame": "front-center"}}
+- 3. parse result.content[0].text as JSON; take its selections
+- 4. in selections: set frame to front-center; delete every key named in unavailableFields (export_bot rejects them); delete size (character size collides with PNG size 2048 in downloadUrl: 'Use size 1024 or 2048.')
+- 5. same character or same accessory as an existing bot: back to step 2, up to 3 rerolls
+- 6. call export_bot with {"selections": <cleaned selections>, "format": "png", "size": 2048}
+- 7. downloadUrl still has a size= other than size=2048: strip that parameter
+- 8. download downloadUrl to ROOT/avatars/<bot>.png; check it is a 2048 x 2048 PNG
+- 9. write export_bot's url (the share link) to ROOT/avatars/<bot>.url, one line
+- 10. look at the PNG; garbled, blank or cut off: back to step 2 (counts as a reroll)
+- 11. message the new bot with the PNG attached: set it as your avatar with UpdateAvatar, then confirm; a bot can only set its own picture
+
+Decide:
+- isError true: read its text, fix the named field, retry once; still failing: fallback
+- picks given and they match an existing bot: keep picks; tell owner which bot it resembles
+- 3 rerolls still match: keep the last; tell owner which bot it resembles
+- ROOT/avatars/<bot>.png exists: ask owner before overwriting
+- server down or still failing: fallback only, https://botbuilder.mipmap.ai/ in the desktop browser: its WebMCP tools if exposed, else the UI (Randomize, Frame tab Centered, 2x / Download PNG 2048 x 2048, copy share link); save to the same two files
+
+Run:
+- curl -sS -X POST https://botbuilder.mipmap.ai/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"<tool>","arguments":<arguments>}}'
+- curl -fsS -o ROOT/avatars/<bot>.png '<downloadUrl>' && file ROOT/avatars/<bot>.png
+- tools: get_bot_options, create_bot, edit_bot, randomize_bot, get_bot_share_link, export_bot; schemas: same curl with {"jsonrpc":"2.0","id":1,"method":"tools/list"}
+
+Never:
+- drop the Accept header from the curl; without it the server answers Not Acceptable
+- pass randomize_bot's selections to export_bot unchanged
+- write avatars inside ROOT/botkit
+- use the browser path while the MCP server works
