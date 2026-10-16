@@ -15,3 +15,6 @@ References:
 Voice:
 - one line per item
 - link first
+
+Confirm:
+- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything

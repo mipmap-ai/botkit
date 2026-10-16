@@ -17,6 +17,9 @@ Decide:
 - none found: say nothing
 - archive fails: stop, report error
 
+Confirm:
+- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything
+
 Run:
 - mailtool archive --older-than 30d --folder drafts
 

@@ -3,7 +3,7 @@ name: design-a-grok-bot
 description: >-
   Use when designing or creating a new Grok Bot. Agree its purpose, generate
   the profile with botkit in the standard
-  Purpose/Responsibilities/Boundaries/Safety/References/Voice format, write
+  Purpose/Responsibilities/Boundaries/Safety/References/Voice/Confirm format, write
   its safety check if it has risky actions, create it, add it to the fleet
   file, then verify against the live profile.
 ---
@@ -35,6 +35,9 @@ References:
 
 Voice:
 - a few words per line
+
+Confirm:
+- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything
 ```
 
 Every field is a dash list, even with one item, one blank line between fields. Boundaries, Safety and References are optional and left out when empty. Check its token cost with `skills/cost-review`.
@@ -83,7 +86,30 @@ Give it safety tests in either form: a cases file `ROOT/safety/<program>.cases.j
 
 ## Skill format
 
-Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`) and save them as in "Saving one botkit skill" in `ROOT/botkit/AGENTS.md`; a file on disk does nothing. Check its token cost with `skills/cost-review`. Terse dash lists, steps only; reference material goes to `ROOT/references/`. Name another skill by path (`skills/<name>`) and generate with `--root ROOT` so a missing one fails. Sections, only those that apply: Purpose (one line), Input, Steps, Decide (go if / else / on failure), Run (exact commands), Never (hard limits not in a Safety program).
+Generate skills with `python3 ROOT/botkit/botkit.py skill` (or `jev-skill`) and save them as in "Saving one botkit skill" in `ROOT/botkit/AGENTS.md`; a file on disk does nothing. Check its token cost with `skills/cost-review`. Terse dash lists, steps only; reference material goes to `ROOT/references/`. Name another skill by path (`skills/<name>`) and generate with `--root ROOT` so a missing one fails. Sections, only those that apply: Purpose (one line), Input, Steps, Decide (go if / else / on failure), Confirm (conditional decision rule, defaulted by botkit), Run (exact commands), Never (hard limits not in a Safety program).
+
+```
+Purpose:
+- what the skill gets done
+
+Input:
+- what it starts from
+
+Steps:
+- 1. one action
+
+Decide:
+- go if / else / on failure
+
+Confirm:
+- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything
+
+Run:
+- exact command
+
+Never:
+- hard limit not in a Safety program
+```
 
 Jev skills add `Questions:` (`name (yes/no or pick-one): what a yes means`, matching the questions file passed to Jev); Decide lists exact code checks first (dedupe, allowlists, dates), then score thresholds, then what to do when Jev is down (exit 2).
 

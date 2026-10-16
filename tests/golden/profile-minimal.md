@@ -10,3 +10,6 @@ Boundaries:
 
 Voice:
 - one line each
+
+Confirm:
+- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything

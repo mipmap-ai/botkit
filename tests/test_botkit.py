@@ -12,6 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 BOTKIT = ROOT / "botkit.py"
 GOLDEN = ROOT / "tests" / "golden"
 EXAMPLES = ROOT / "examples"
+CONFIRM_SECTION = (
+    "Confirm:\n"
+    "- when a decision or possible decision appears, show the decision card with the multiple-choice options; wait for a yes before doing anything\n"
+)
 
 GOLDEN_CASES = {
     "profile-full": "profile",
@@ -54,6 +58,36 @@ class GenerateTest(unittest.TestCase):
                 self.assertEqual(first, (GOLDEN / f"{name}.md").read_bytes())
                 self.assertNotIn(b"\r", first)
                 self.assertTrue(first.endswith(b"\n") and not first.endswith(b"\n\n"))
+
+    def test_confirm_default_and_override(self):
+        for kind, case in (("profile", "profile-full"), ("skill", "skill"),
+                           ("jev-skill", "jev-skill")):
+            data = json.loads((GOLDEN / f"{case}.json").read_text(encoding="utf-8"))
+            self.assertNotIn("confirm", data)
+            for custom in (False, True):
+                with self.subTest(kind=kind, custom=custom):
+                    if custom:
+                        data["confirm"] = ["ask before choosing", "wait for approval"]
+                    expected = ("Confirm:\n- ask before choosing\n- wait for approval\n"
+                                if custom else CONFIRM_SECTION)
+                    from_json = self.assertOk(botkit(
+                        kind, "--json", "-", stdin=json.dumps(data).encode())).decode()
+                    flag = {"responsibilities": "--responsibility", "boundaries": "--boundary",
+                            "references": "--reference", "questions": "--question",
+                            "steps": "--step", "thresholds": "--threshold", "jev_down": "--jev-down"}
+                    args = [kind]
+                    for key, values in data.items():
+                        for value in [values] if isinstance(values, str) else values:
+                            args += [flag.get(key, f"--{key}"), value]
+                    from_flags = self.assertOk(botkit(*args)).decode()
+                    self.assertEqual(from_flags, from_json)
+                    self.assertIn(expected, from_json)
+                    self.assertEqual(from_json.count("Confirm:"), 1)
+                    order = headers(from_json)
+                    previous = "Voice:" if kind == "profile" else "Decide:"
+                    self.assertEqual(order[order.index(previous) + 1], "Confirm:")
+                    if custom:
+                        self.assertNotIn(CONFIRM_SECTION, from_json)
 
     def test_flags_match_json(self):
         data = json.loads((GOLDEN / "profile-full.json").read_text(encoding="utf-8"))
@@ -131,23 +165,23 @@ class OmitTest(unittest.TestCase):
         out = botkit("profile", "--json", GOLDEN / "profile-minimal.json").stdout.decode()
         self.assertNotIn("Safety:", out)
         self.assertNotIn("References:", out)
-        self.assertEqual(headers(out), ["Purpose:", "Responsibilities:", "Boundaries:", "Voice:"])
+        self.assertEqual(headers(out), ["Purpose:", "Responsibilities:", "Boundaries:", "Voice:", "Confirm:"])
 
     def test_absent_equals_empty(self):
         out = botkit("profile", "--purpose", "p", "--responsibility", "r",
                      "--boundary", "b", "--voice", "v").stdout
-        self.assertEqual(out, b"Purpose:\n- p\n\nResponsibilities:\n- r\n\nBoundaries:\n- b\n\nVoice:\n- v\n")
+        self.assertEqual(out, ("Purpose:\n- p\n\nResponsibilities:\n- r\n\nBoundaries:\n- b\n\nVoice:\n- v\n\n" + CONFIRM_SECTION).encode())
 
     def test_boundaries_optional(self):
         missing = botkit("profile", "--json", GOLDEN / "profile-no-boundaries.json")
         self.assertEqual(missing.returncode, 0, missing.stderr.decode())
-        self.assertEqual(headers(missing.stdout.decode()), ["Purpose:", "Responsibilities:", "Voice:"])
+        self.assertEqual(headers(missing.stdout.decode()), ["Purpose:", "Responsibilities:", "Voice:", "Confirm:"])
         empty = botkit("profile", "--json", GOLDEN / "profile-empty-boundaries.json")
         self.assertEqual(empty.returncode, 0, empty.stderr.decode())
         self.assertEqual(headers(empty.stdout.decode()),
-                         ["Purpose:", "Responsibilities:", "References:", "Voice:"])
+                         ["Purpose:", "Responsibilities:", "References:", "Voice:", "Confirm:"])
         flags = botkit("profile", "--purpose", "p", "--responsibility", "r", "--voice", "v").stdout
-        self.assertEqual(flags, b"Purpose:\n- p\n\nResponsibilities:\n- r\n\nVoice:\n- v\n")
+        self.assertEqual(flags, ("Purpose:\n- p\n\nResponsibilities:\n- r\n\nVoice:\n- v\n\n" + CONFIRM_SECTION).encode())
 
 
 class LayoutTest(unittest.TestCase):
@@ -155,7 +189,8 @@ class LayoutTest(unittest.TestCase):
         "Purpose:\n- spot mentions worth answering\n\n"
         "Responsibilities:\n- scan new mentions\n- flag ones needing a reply\n\n"
         "Boundaries:\n- scouts only; never posts\n\n"
-        "Voice:\n- one line each\n"
+        "Voice:\n- one line each\n\n"
+        + CONFIRM_SECTION
     )
 
     def test_hand_written_profile_regenerates_without_diff(self):
@@ -264,7 +299,7 @@ class FleetTest(unittest.TestCase):
 
     def test_skill_optional_sections_left_out(self):
         out = botkit("skill", "--purpose", "p", "--step", "s").stdout
-        self.assertEqual(out, b"Purpose:\n- p\n\nSteps:\n- 1. s\n")
+        self.assertEqual(out, ("Purpose:\n- p\n\nSteps:\n- 1. s\n\n" + CONFIRM_SECTION).encode())
 
 
 class ErrorTest(unittest.TestCase):
